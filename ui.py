@@ -171,6 +171,14 @@ class BSETUP_PT_ShapeEditor(bpy.types.Panel):
         col.separator()
         col.operator("bsetup.mirror_shape_and_driver", text="Mirror Shape & Driver", icon='MOD_MIRROR')
         
+        # Asymmetry
+        box = layout.box()
+        box.use_property_split = True
+        col = box.column(align=True)
+        col.label(text="Asymmetry / Split", icon='MESH_DATA')
+        col.operator("bsetup.create_asym_shape", text="Create Asym Shape", icon='ADD')
+        col.operator("bsetup.split_shape", text="Split Active Shape L/R")
+        
         # Combo
         box = layout.box()
         box.use_property_split = True # Apply locally

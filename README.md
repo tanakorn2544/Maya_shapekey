@@ -46,6 +46,16 @@ A dedicated list view and toolkit for managing shape keys.
         *   Supports standard naming conventions: `.L/.R`, `_L/_R`, `.l/.r`, `_l/_r`.
         *   **Topology Mirror**: Option to use topological mirroring for non-symmetrical posed meshes.
 
+### 5. Asymmetry / Split Tools
+New workflow for asymmetrical meshes or complex sculpting.
+*   **Create Asym Shape**:
+    *   Creates a new shape key and **automatically enables X-Mirror and Topology Mirror** on your mesh.
+    *   Allows symmetric sculpting on asymmetrical geometry.
+*   **Split Active Shape L/R**:
+    *   Takes a completed shape key.
+    *   Automatically generates Left/Right masks based on the X-axis.
+    *   Splits the shape into two separate keys (e.g. `Mouth_L`, `Mouth_R`).
+
 ## Usage Workflow
 1.  **Select your Mesh**.
 2.  Open the **N-Panel (Sidebar)** in the 3D Viewport and find the **Maya Shape Keys** tab.
@@ -57,3 +67,10 @@ A dedicated list view and toolkit for managing shape keys.
     *   Dial up the shape key.
     *   Click **Key Driver**.
 7.  **Mirror**: Click **Mirror Shape & Driver** to instantly create the opposite side setup.
+
+## Workflow: Asymmetrical Character
+1.  Click **Create Asym Shape**.
+2.  Sculpt your expression (e.g. a Smile) on BOTH sides at once (thanks to auto-topology mirror).
+3.  When finished, click **Split Active Shape L/R**.
+4.  The addon creates `AsymShape_L` and `AsymShape_R` for you.
+5.  Set Drivers for these new split shapes as usual.

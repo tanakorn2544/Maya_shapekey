@@ -623,6 +623,8 @@ class BSETUP_OT_MirrorShapeAndDriver(bpy.types.Operator):
         default=False
     )
     
+
+    
     use_topology: bpy.props.BoolProperty(
         name="Topology Mirror",
         description="Use topology based mirroring (for meshes that are not strictly symmetrical in space)",
@@ -710,6 +712,133 @@ class BSETUP_OT_MirrorShapeAndDriver(bpy.types.Operator):
             
         return {'FINISHED'}
 
+class BSETUP_OT_SplitShape(bpy.types.Operator):
+    """Split the current shape key into Left and Right sides using an auto-generated Vertex Group mask"""
+    bl_idname = "bsetup.split_shape"
+    bl_label = "Split Shape L/R"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    threshold: bpy.props.FloatProperty(
+        name="Center Threshold",
+        default=0.001,
+        description="Threshold for center vertices (X-axis)"
+    )
+    
+    def execute(self, context):
+        obj = context.active_object
+        if not obj or obj.type != 'MESH':
+            self.report({'ERROR'}, "Select a Mesh Object")
+            return {'CANCELLED'}
+        
+        if not obj.data.shape_keys or not obj.active_shape_key:
+            self.report({'ERROR'}, "No Active Shape Key")
+            return {'CANCELLED'}
+            
+        source_key = obj.active_shape_key
+        source_name = source_key.name
+        
+        # 1. GENERATE MASKS
+        # Naming: Split_Mask_L (X >= 0), Split_Mask_R (X < 0)
+        # Using standard conventions: +X is Left (Character Left), -X is Right.
+        
+        group_l_name = "Split_Mask_L"
+        group_r_name = "Split_Mask_R"
+        
+        # Get or Create Groups
+        vg_l = obj.vertex_groups.get(group_l_name)
+        if not vg_l: vg_l = obj.vertex_groups.new(name=group_l_name)
+        
+        vg_r = obj.vertex_groups.get(group_r_name)
+        if not vg_r: vg_r = obj.vertex_groups.new(name=group_r_name)
+        
+        # Determine indices
+        # We perform this in Object Mode (implied) to access data safely
+        mesh = obj.data
+        
+        # Prepare lists
+        indices_l = []
+        indices_r = []
+        
+        # Simple threshold check
+        t = self.threshold
+        for v in mesh.vertices:
+            if v.co.x >= -t: # Include 0 or near 0 in Left
+                indices_l.append(v.index)
+            else:
+                indices_r.append(v.index)
+                
+        # Clear existing weights in these groups to be safe
+        obj.vertex_groups[group_l_name].remove([v.index for v in mesh.vertices])
+        obj.vertex_groups[group_r_name].remove([v.index for v in mesh.vertices])
+        
+        # Assign new weights
+        if indices_l: vg_l.add(indices_l, 1.0, 'REPLACE')
+        if indices_r: vg_r.add(indices_r, 1.0, 'REPLACE')
+        
+        # 2. CREATE SPLIT KEYS
+        key_blocks = obj.data.shape_keys.key_blocks
+        stored_values = {kb.name: kb.value for kb in key_blocks} # Backup
+        
+        # Reset all to 0
+        for kb in key_blocks: kb.value = 0.0
+        # Set source to 1.0
+        key_blocks[source_name].value = 1.0
+        
+        # Create Left
+        name_l = f"{source_name}_L"
+        obj.shape_key_add(name=name_l, from_mix=True)
+        kb_l = key_blocks[len(key_blocks)-1]
+        kb_l.name = name_l 
+        kb_l.vertex_group = group_l_name
+        kb_l.value = 0.0 
+        
+        # Create Right
+        name_r = f"{source_name}_R"
+        obj.shape_key_add(name=name_r, from_mix=True)
+        kb_r = key_blocks[len(key_blocks)-1]
+        kb_r.name = name_r
+        kb_r.vertex_group = group_r_name
+        kb_r.value = 0.0
+        
+        # Restore original values
+        for k, v in stored_values.items():
+            key_blocks[k].value = v
+            
+        self.report({'INFO'}, f"Split '{source_name}' into L/R")
+        return {'FINISHED'}
+
+
+class BSETUP_OT_CreateAsymShape(bpy.types.Operator):
+    """Create a new shape key and enable Topology Mirroring for asymmetrical sculpting"""
+    bl_idname = "bsetup.create_asym_shape"
+    bl_label = "Create Asym Shape"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        obj = context.active_object
+        if not obj or obj.type != 'MESH':
+            self.report({'ERROR'}, "Select a Mesh Object")
+            return {'CANCELLED'}
+        
+        # Ensure Basis exists
+        if not obj.data.shape_keys:
+            obj.shape_key_add(name="Basis")
+            
+        # Create new key
+        key = obj.shape_key_add(name="AsymShape", from_mix=False)
+        key.value = 0.0
+        
+        # Select it
+        obj.active_shape_key_index = obj.data.shape_keys.key_blocks.find(key.name)
+        
+        # Enable Mirroring options
+        obj.data.use_mirror_x = True
+        obj.data.use_mirror_topology = True
+        
+        self.report({'INFO'}, "Created Shape & Enabled Topology Mirror")
+        return {'FINISHED'}
+
+
 classes = (
     BSETUP_OT_LoadDriver,
     BSETUP_OT_UpdateDriverValue,
@@ -721,6 +850,9 @@ classes = (
     BSETUP_OT_SetChannel,
     BSETUP_OT_MirrorDriver,
     BSETUP_OT_MirrorShapeAndDriver,
+
+    BSETUP_OT_SplitShape,
+    BSETUP_OT_CreateAsymShape,
 )
 
 def register():
