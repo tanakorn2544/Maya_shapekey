@@ -165,33 +165,26 @@ class BSETUP_OT_AddDriverKey(bpy.types.Operator):
         driver_obj = props.driver_target
         driven_obj = props.driven_object
         
-        if driver_obj and driver_obj.type == 'ARMATURE' and props.driver_bone:
-             if props.driver_bone not in driver_obj.pose.bones:
-                 self.report({'ERROR'}, f"Bone '{props.driver_bone}' not found")
-                 return {'CANCELLED'}
-        
         if not driver_obj or not driven_obj:
             self.report({'ERROR'}, "Driver or Driven object missing")
             return {'CANCELLED'}
-            
-        if not props.driven_key:
-             self.report({'ERROR'}, "No Driven Shape Key selected")
-             return {'CANCELLED'}
+        
+        if driver_obj.type == 'ARMATURE' and props.driver_bone:
+             if props.driver_bone not in driver_obj.pose.bones:
+                 self.report({'ERROR'}, f"Bone '{props.driver_bone}' not found")
+                 return {'CANCELLED'}
 
+        # --- PREPARE DRIVER INFO ---
         raw_path = props.driver_data_path
         if not raw_path:
              self.report({'ERROR'}, "Driver Data Path is empty")
              return {'CANCELLED'}
 
-        # --- SMART TRANSFORM DETECTION ---
-        # Detect if we are targeting a standard transform channel (Loc/Rot/Scale)
-        # to use the robust 'TRANSFORMS' variable type (handles Quaternions etc).
-        
-        target_transform_type = None # 'LOC_X', 'ROT_Z', etc.
-        target_component = 0 # 0, 1, 2
+        # Smart Transform Detection (for the INPUT/DRIVER side)
+        target_transform_type = None 
+        target_component = 0
         is_transform = False
         
-        # Simple parsing of standard paths set by our buttons
         if raw_path.startswith("location"):
             is_transform = True
             if "[0]" in raw_path: target_transform_type = 'LOC_X'; target_component = 0
@@ -200,7 +193,6 @@ class BSETUP_OT_AddDriverKey(bpy.types.Operator):
             
         elif raw_path.startswith("rotation"): # rotation_euler / rotation_quaternion checking
             is_transform = True
-            # We map any rotation path request to Euler decomposition for the driver
             if "[0]" in raw_path: target_transform_type = 'ROT_X'; target_component = 0
             elif "[1]" in raw_path: target_transform_type = 'ROT_Y'; target_component = 1
             elif "[2]" in raw_path: target_transform_type = 'ROT_Z'; target_component = 2
@@ -211,143 +203,234 @@ class BSETUP_OT_AddDriverKey(bpy.types.Operator):
             elif "[1]" in raw_path: target_transform_type = 'SCALE_Y'; target_component = 1
             elif "[2]" in raw_path: target_transform_type = 'SCALE_Z'; target_component = 2
 
-        # --- 1. FETCH DRIVER VALUE ---
+        # 1. FETCH DRIVER VALUE
         current_driver_val = 0.0
         
         if is_transform and target_transform_type:
-            # Calculate from Matrix (Handles Quaternions, Constraints, etc correctly for LOCAL space)
-            # We want LOCAL value to match 'Structure' / 'Maya SDK' feel.
-            
             matrix = None
-            rot_mode = 'XYZ' # Default
+            rot_mode = 'XYZ' 
             
             if driver_obj.type == 'ARMATURE' and props.driver_bone:
                 pb = driver_obj.pose.bones.get(props.driver_bone)
                 if pb:
-                    matrix = pb.matrix_basis # Local to parent
+                    matrix = pb.matrix_basis 
                     rot_mode = pb.rotation_mode
             else:
-                matrix = driver_obj.matrix_basis # Local to parent
+                matrix = driver_obj.matrix_basis
                 rot_mode = driver_obj.rotation_mode
             
             if matrix:
                 if "LOC" in target_transform_type:
                     current_driver_val = matrix.to_translation()[target_component]
                 elif "ROT" in target_transform_type:
-                    # Driver 'ROT_X/Y/Z' usually uses Euler representation
-                    # We convert the matrix to Euler
                     safe_mode = rot_mode if rot_mode in {'XYZ', 'XZY', 'YXZ', 'YZX', 'ZXY', 'ZYX'} else 'XYZ'
                     euls = matrix.to_euler(safe_mode)
                     current_driver_val = euls[target_component]
                 elif "SCALE" in target_transform_type:
                     current_driver_val = matrix.to_scale()[target_component]
         else:
-            # Fallback to Raw Property Path (Custom Props)
+            # Fallback
             try:
                 if driver_obj.type == 'ARMATURE' and props.driver_bone:
-                    # Try bone first
                     pb = driver_obj.pose.bones.get(props.driver_bone)
-                    found_on_bone = False
                     if pb:
                         try:
                             current_driver_val = pb.path_resolve(raw_path)
-                            found_on_bone = True
                         except:
-                            pass
-
-                    if not found_on_bone:
+                            current_driver_val = driver_obj.path_resolve(raw_path) # Fallback to Obj if bone fails
+                    else:
                         current_driver_val = driver_obj.path_resolve(raw_path)
                 else:
                     current_driver_val = driver_obj.path_resolve(raw_path)
             except:
                  self.report({'ERROR'}, f"Could not resolve path: {raw_path}")
                  return {'CANCELLED'}
-
-        # --- 2. FETCH DRIVEN VALUE ---
-        key_block = driven_obj.data.shape_keys.key_blocks.get(props.driven_key)
-        if not key_block:
-             self.report({'ERROR'}, "Shape Key not found")
-             return {'CANCELLED'}
-        current_driven_val = key_block.value
         
-        # Update UI props
         props.driver_value = float(current_driver_val)
-        props.driven_value = float(current_driven_val)
-        
-        # --- 3. CREATE/UPDATE DRIVER ---
-        key_data = driven_obj.data.shape_keys
-        data_path = f'key_blocks["{props.driven_key}"].value'
-        
-        if not key_data.animation_data:
-            key_data.animation_data_create()
+
+        # --- BRANCH BASED ON DRIVEN TYPE ---
+
+        if props.driven_type == 'KEY':
+            # --- SHAPE KEY LOGIC ---
+            if not props.driven_key:
+                 self.report({'ERROR'}, "No Driven Shape Key selected")
+                 return {'CANCELLED'}
+                 
+            key_block = driven_obj.data.shape_keys.key_blocks.get(props.driven_key)
+            if not key_block:
+                 self.report({'ERROR'}, "Shape Key not found")
+                 return {'CANCELLED'}
+                 
+            current_driven_val = key_block.value
+            props.driven_value = float(current_driven_val)
             
-        fcurve = None
-        for fc in key_data.animation_data.drivers:
-            if fc.data_path == data_path:
-                fcurve = fc
-                break
+            # Setup Driver
+            key_data = driven_obj.data.shape_keys
+            data_path = f'key_blocks["{props.driven_key}"].value'
+            
+            self._setup_single_driver(driver_obj, key_data, data_path, current_driver_val, current_driven_val, props, is_transform, target_transform_type, raw_path)
+            
+            self.report({'INFO'}, f"Keyed {props.driven_key} at {current_driven_val:.2f} (Driver: {current_driver_val:.2f})")
+
+        elif props.driven_type == 'POSE':
+            # --- POSE LOGIC ---
+            if driven_obj.type != 'ARMATURE':
+                 self.report({'ERROR'}, "Driven Object must be an Armature for Pose mode")
+                 return {'CANCELLED'}
+                 
+            selected_bones = context.selected_pose_bones
+            if not selected_bones:
+                 self.report({'ERROR'}, "No bones selected to drive")
+                 return {'CANCELLED'}
+
+            # Collect channels
+            channels = [] # (data_path_base, index)
+            if props.drive_location:
+                channels.extend([("location", 0), ("location", 1), ("location", 2)])
+            if props.drive_scale:
+                channels.extend([("scale", 0), ("scale", 1), ("scale", 2)])
+            if props.drive_rotation:
+                # We'll check rotation mode per bone, but usually it's euler or quat
+                # We add generic "rotation" tag to handle per-bone check
+                channels.append(("rotation", -1)) 
+            
+            if not channels:
+                 self.report({'WARNING'}, "No channels selected (Loc/Rot/Scale)")
+                 return {'CANCELLED'}
+
+            count = 0
+            for pb in selected_bones:
+                # Resolve Rotation Channels per bone
+                bone_channels = []
+                for ch, idx in channels:
+                    if ch == "rotation":
+                        if pb.rotation_mode == 'QUATERNION':
+                            # indices 0,1,2,3
+                            bone_channels.extend([("rotation_quaternion", i) for i in range(4)])
+                        elif pb.rotation_mode == 'AXIS_ANGLE':
+                             bone_channels.extend([("rotation_axis_angle", i) for i in range(4)])
+                        else: # Euler
+                             bone_channels.extend([("rotation_euler", i) for i in range(3)])
+                    else:
+                        bone_channels.append((ch, idx))
                 
-        if not fcurve:
-            # Create new driver
-            fcurve = key_data.driver_add(data_path)
-            drv = fcurve.driver
-            drv.type = 'SCRIPTED'
-            drv.expression = "var"
+                # Create Drivers
+                for ch_name, idx in bone_channels:
+                    # Current Value
+                    try:
+                        val_arr = getattr(pb, ch_name)
+                        current_val = val_arr[idx]
+                    except:
+                        continue
+                        
+                    data_path = f'pose.bones["{pb.name}"].{ch_name}'
+                    
+                    self._setup_single_driver(driver_obj, driven_obj, data_path, current_driver_val, current_val, props, is_transform, target_transform_type, raw_path, array_index=idx)
+                    count += 1
             
-            # Setup Variable
+            self.report({'INFO'}, f"Keyed {count} Pose Channels")
+
+        return {'FINISHED'}
+
+    def _setup_single_driver(self, driver_obj, id_data_owner, data_path, driver_val, driven_val, props, is_transform, target_transform_type, raw_path, array_index=-1):
+        """Helper to create/update a driver on a specific path"""
+        
+        # Decide where to add driver
+        # If id_data_owner is Object/Key, check animation_data
+        if not id_data_owner.animation_data:
+            id_data_owner.animation_data_create()
+            
+        # Find or create fcurve
+        fcurve = None
+        # Should we search? driver_add usually finds or creates.
+        # But we need to be careful not to create duplicates if we can avoid it, 
+        # though driver_add acts as "get or create".
+        
+        if array_index >= 0:
+            fcurve = id_data_owner.driver_add(data_path, array_index)
+        else:
+            fcurve = id_data_owner.driver_add(data_path)
+            
+        drv = fcurve.driver
+        # If new or refreshing, ensure Type
+        if drv.type != 'SCRIPTED': # Only reset if not scripted? standardizing
+             drv.type = 'SCRIPTED'
+        drv.expression = "var" # Default
+        
+        # Setup Variable (if not exists or force update?)
+        # Let's clean and recreate to ensure it matches current settings
+        # BUT: preserve existing curve points!
+        
+        # Check if "var" exists
+        var = None
+        for v in drv.variables:
+            if v.name == "var": 
+                var = v
+                break
+        
+        if not var:
             var = drv.variables.new()
             var.name = "var"
+        
+        # Setup Target
+        # Determine Default/Rest Value for Auto-Keying (0 for Loc/Rot, 1 for Scale)
+        default_rest_val = 1.0 if (target_transform_type and "SCALE" in target_transform_type) else 0.0
+        
+        if is_transform and target_transform_type:
+            var.type = 'TRANSFORMS'
+            target = var.targets[0]
+            target.id = driver_obj
+            if driver_obj.type == 'ARMATURE' and props.driver_bone:
+                target.bone_target = props.driver_bone
             
-            # Determine Default/Rest Value for Auto-Keying
-            # Loc/Rot defaults to 0. Scale defaults to 1.
-            default_rest_val = 1.0 if (target_transform_type and "SCALE" in target_transform_type) else 0.0
-            
-            if is_transform and target_transform_type:
-                # Use TRANSFORMS type
-                var.type = 'TRANSFORMS'
-                target = var.targets[0]
-                target.id = driver_obj
-                if driver_obj.type == 'ARMATURE' and props.driver_bone:
-                    target.bone_target = props.driver_bone
-                
-                target.transform_type = target_transform_type
-                target.transform_space = 'LOCAL_SPACE' # Crucial for rig-like behavior
-                
+            target.transform_type = target_transform_type
+            target.transform_space = 'LOCAL_SPACE'
+        else:
+            var.type = 'SINGLE_PROP'
+            target = var.targets[0]
+            target.id = driver_obj
+            if driver_obj.type == 'ARMATURE' and props.driver_bone:
+                 target.bone_target = props.driver_bone
+                 target.data_path = raw_path
             else:
-                # Use SINGLE_PROP type
-                var.type = 'SINGLE_PROP'
-                target = var.targets[0]
-                target.id = driver_obj
-                if driver_obj.type == 'ARMATURE' and props.driver_bone:
-                     target.bone_target = props.driver_bone
-                     target.data_path = raw_path
-                else:
-                     target.data_path = raw_path
-            
-            # Auto-insert Rest Key (0,0) or (1,0) if this is a NEW driver
-            # This ensures that if the user keys the Active pose (e.g. 1.0), 
-            # we implicitly have a start point at Rest.
-            # Only do this if the current key being added is NOT the rest pose itself.
-            if abs(current_driver_val - default_rest_val) > 0.001:
-                 fcurve.keyframe_points.insert(default_rest_val, 0.0)
-            
-        # Remove Modifiers & Key
+                 target.data_path = raw_path
+                 
+        # Auto-insert Rest Key if needed (only if "new" - practically hard to detect "new" perfectly per curve)
+        # We can check if curve has points.
+        if len(fcurve.keyframe_points) == 0:
+             # Just add rest pose?
+             # Only if current pose is different from rest?
+             if abs(driver_val - default_rest_val) > 0.001:
+                  fcurve.keyframe_points.insert(default_rest_val, 0.0) # Assume Default Driven Value is 0 ? 
+                  # WAIT: Default Driven Value for BONES might not be 0.
+                  # For Shape Keys, 0 is default.
+                  # For Bones: Loc/Rot is 0 (usually). Scale is 1.
+                  # If we drive Bone SCALING, the 'rest' driven value is 1.
+                  
+                  # We should match 'Rest' of Driven to 'Rest' of Driver.
+                  # For simplicity, we assume Driven Rest is 0 for Loc/Rot, 1 for Scale.
+                  # We can infer from data_path?
+                  
+                  driven_rest = 0.0
+                  if "scale" in data_path: driven_rest = 1.0
+                  if "quaternion" in data_path and array_index == 0: driven_rest = 1.0 # W component
+                  
+                  fcurve.keyframe_points.insert(default_rest_val, driven_rest)
+
+        # Remove Modifiers
         for mod in fcurve.modifiers:
             fcurve.modifiers.remove(mod)
             
-        # Create key
-        kp_driver = fcurve.keyframe_points.insert(current_driver_val, current_driven_val)
+        # Create Key
+        kp = fcurve.keyframe_points.insert(driver_val, driven_val)
         
-        # Apply Interpolation
-        kp_driver.interpolation = props.driver_interpolation
+        # Interpolation
+        kp.interpolation = props.driver_interpolation
         if props.driver_interpolation == 'BEZIER':
-            kp_driver.handle_left_type = 'AUTO_CLAMPED'
-            kp_driver.handle_right_type = 'AUTO_CLAMPED'
+            kp.handle_left_type = 'AUTO_CLAMPED'
+            kp.handle_right_type = 'AUTO_CLAMPED'
             
         fcurve.update()
-
-        self.report({'INFO'}, f"Keyed {props.driven_key} at {current_driven_val:.2f} (Driver: {current_driver_val:.2f}) [{props.driver_interpolation}]")
-        return {'FINISHED'}
 
 class BSETUP_OT_AddComboShape(bpy.types.Operator):
     """Create a new shape key driven by the product of two other keys"""
@@ -506,29 +589,48 @@ class BSETUP_OT_SetChannel(bpy.types.Operator):
         return {'FINISHED'}
 
 
+import re
+
 def flip_name(name):
-    """Flip .L/.R or _L/_R naming convention"""
-    if name.endswith('.L'): return name[:-2] + '.R'
-    if name.endswith('.R'): return name[:-2] + '.L'
-    if name.endswith('.l'): return name[:-2] + '.r'
-    if name.endswith('.r'): return name[:-2] + '.l'
+    """Flip .L/.R, _L/_R, L_, R_, Left, Right naming conventions, preserving suffixes like .001"""
     
-    if name.endswith('_L'): return name[:-2] + '_R'
-    if name.endswith('_R'): return name[:-2] + '_L'
-    if name.endswith('_l'): return name[:-2] + '_r'
-    if name.endswith('_r'): return name[:-2] + '_l'
+    # 1. Complex Patterns (Suffix sensitive)
+    # Matches _L or .L followed by end of string or a dot (for .001)
+    # Group 1: The separator (. or _)
+    # Group 2: The suffix (.001 or empty)
     
-    if '.L.' in name: return name.replace('.L.', '.R.')
-    if '.R.' in name: return name.replace('.R.', '.L.')
-    if '.l.' in name: return name.replace('.l.', '.r.')
-    if '.r.' in name: return name.replace('.r.', '.l.')
-    
+    # Check _L / _R
+    if re.search(r'(_[Ll])($|\.)', name):
+        return re.sub(r'(_[Ll])($|\.)', lambda m: m.group(1).replace('l', 'r').replace('L', 'R') + m.group(2), name)
+    if re.search(r'(_[Rr])($|\.)', name):
+        return re.sub(r'(_[Rr])($|\.)', lambda m: m.group(1).replace('r', 'l').replace('R', 'L') + m.group(2), name)
+
+    # Check .L / .R
+    if re.search(r'(\.[Ll])($|\.)', name):
+        return re.sub(r'(\.[Ll])($|\.)', lambda m: m.group(1).replace('l', 'r').replace('L', 'R') + m.group(2), name)
+    if re.search(r'(\.[Rr])($|\.)', name):
+        return re.sub(r'(\.[Rr])($|\.)', lambda m: m.group(1).replace('r', 'l').replace('R', 'L') + m.group(2), name)
+
+    # 2. Variable Separators (for middle occurrences)
+    # _L_ -> _R_
     if '_L_' in name: return name.replace('_L_', '_R_')
     if '_R_' in name: return name.replace('_R_', '_L_')
     if '_l_' in name: return name.replace('_l_', '_r_')
     if '_r_' in name: return name.replace('_r_', '_l_')
     
-    return None  # No flip found
+    # 3. Prefixes
+    if name.startswith('L_'): return 'R_' + name[2:]
+    if name.startswith('R_'): return 'L_' + name[2:]
+    if name.startswith('L.'): return 'R.' + name[2:]
+    if name.startswith('R.'): return 'L.' + name[2:]
+    
+    # 4. Words
+    if "Left" in name: return name.replace("Left", "Right")
+    if "Right" in name: return name.replace("Right", "Left")
+    if "left" in name: return name.replace("left", "right")
+    # if "right" in name: return name.replace("right", "left")
+
+    return None
 
 
 class BSETUP_OT_MirrorDriver(bpy.types.Operator):
@@ -595,7 +697,7 @@ class BSETUP_OT_MirrorDriver(bpy.types.Operator):
                 self.report({'ERROR'}, f"Mirrored bone '{flipped_bone}' not found")
                 return {'CANCELLED'}
 
-        success, msg = mirror_driver_logic(self, context, driver_obj, driven_obj, props.driven_key, flipped_key, self.invert_values)
+        success, msg = mirror_shape_driver_logic(self, context, driver_obj, driven_obj, props.driven_key, flipped_key, self.invert_values)
         
         if not success:
              self.report({'ERROR'}, msg)
@@ -607,8 +709,10 @@ class BSETUP_OT_MirrorDriver(bpy.types.Operator):
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
 
-def mirror_driver_logic(self, context, driver_obj, driven_obj, source_key_name, target_key_name, invert_values=False):
-    """Shared logic for mirroring drivers"""
+
+
+def mirror_shape_driver_logic(self, context, driver_obj, driven_obj, source_key_name, target_key_name, invert_values=False):
+    """Specific logic for mirroring Shape Key drivers"""
     key_data = driven_obj.data.shape_keys
     if not key_data or not key_data.animation_data:
         return False, "No driver found on current shape key"
@@ -633,10 +737,15 @@ def mirror_driver_logic(self, context, driver_obj, driven_obj, source_key_name, 
         pass
         
     target_fcurve = key_data.driver_add(target_path)
-    target_drv = target_fcurve.driver
+    copy_driver_to_fcurve(source_fcurve, target_fcurve, invert_values)
     
-    # Copy driver settings
+    return True, "Success"
+
+def copy_driver_to_fcurve(source_fcurve, target_fcurve, invert_values=False):
+    """Copy all driver settings and keyframes from source to target fcurve"""
+    target_drv = target_fcurve.driver
     source_drv = source_fcurve.driver
+    
     target_drv.type = source_drv.type
     target_drv.expression = source_drv.expression
     
@@ -648,7 +757,20 @@ def mirror_driver_logic(self, context, driver_obj, driven_obj, source_key_name, 
         
         for i, src_tgt in enumerate(src_var.targets):
             tgt = new_var.targets[i]
+            # tgt.id_type is read-only. Setting .id usually sets id_type implicitly.
             tgt.id = src_tgt.id
+            
+            # 1. Try to flip Identifier (Object)
+            if src_tgt.id and hasattr(src_tgt.id, "name"):
+                flipped_id_name = flip_name(src_tgt.id.name)
+                
+                if flipped_id_name:
+                    # Check if exists in same collection type
+                    # Usually objects
+                    if isinstance(src_tgt.id, bpy.types.Object):
+                         if flipped_id_name in bpy.data.objects:
+                             tgt.id = bpy.data.objects[flipped_id_name]
+
             
             if src_var.type == 'TRANSFORMS':
                 tgt.transform_type = src_tgt.transform_type
@@ -658,6 +780,22 @@ def mirror_driver_logic(self, context, driver_obj, driven_obj, source_key_name, 
                     tgt.bone_target = flip_name(src_tgt.bone_target) or src_tgt.bone_target
             else:
                 tgt.data_path = src_tgt.data_path
+                # Flip Data Path string if it contains stereo naming
+                if src_tgt.data_path:
+                    # Naive replace for common patterns if flip_name fails on full string
+                    # Try flipping segments or full string
+                    flipped_path = flip_name(src_tgt.data_path)
+                    if flipped_path:
+                        tgt.data_path = flipped_path
+                    else:
+                        # Try manual sub-string replace (safer)
+                        # e.g. ["Key.L"] -> ["Key.R"]
+                        val = src_tgt.data_path
+                        if ".L" in val: tgt.data_path = val.replace(".L", ".R")
+                        elif ".R" in val: tgt.data_path = val.replace(".R", ".L")
+                        elif "_L" in val: tgt.data_path = val.replace("_L", "_R")
+                        elif "_R" in val: tgt.data_path = val.replace("_R", "_L")
+                        
                 if src_tgt.bone_target:
                     tgt.bone_target = flip_name(src_tgt.bone_target) or src_tgt.bone_target
     
@@ -677,7 +815,101 @@ def mirror_driver_logic(self, context, driver_obj, driven_obj, source_key_name, 
             kp.interpolation = source_fcurve.keyframe_points[i].interpolation
             
     target_fcurve.update()
-    return True, "Success"
+
+
+class BSETUP_OT_MirrorPoseDriver(bpy.types.Operator):
+    """Mirror drivers from selected bones to their symmetrical counterparts"""
+    bl_idname = "bsetup.mirror_pose_driver"
+    bl_label = "Mirror Pose Driver"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    invert_values: bpy.props.BoolProperty(
+        name="Invert Values",
+        description="Negate the values for the mirrored curve (useful for some rotations), but usually redundant if auto-flip logic is perfect. Often needed for X-Location or Z-Rotation depending on rig.",
+        default=False
+    )
+    
+    def execute(self, context):
+        props = context.scene.maya_shape_keys
+        
+        if props.driven_type != 'POSE':
+             self.report({'WARNING'}, "Not in Pose Mode")
+             return {'CANCELLED'}
+             
+        selected_bones = context.selected_pose_bones
+        if not selected_bones:
+             self.report({'WARNING'}, "No bones selected")
+             return {'CANCELLED'}
+             
+        # Channels to mirror
+        channels = [] 
+        if props.drive_location: channels.extend([("location", 0), ("location", 1), ("location", 2)])
+        if props.drive_scale: channels.extend([("scale", 0), ("scale", 1), ("scale", 2)])
+        if props.drive_rotation: channels.append(("rotation", -1))
+        
+        if not channels:
+             self.report({'WARNING'}, "No channels selected")
+             return {'CANCELLED'}
+        
+        count = 0
+        
+        for pb in selected_bones:
+            # 1. Find Mirror Bone
+            mirror_name = flip_name(pb.name)
+            if not mirror_name:
+                 continue # Cannot mirror center bones or un-named sides easily without topological guess
+                 
+            armature = pb.id_data
+            if mirror_name not in armature.pose.bones:
+                 continue
+                 
+            # 2. Process Channels
+            bone_channels = []
+            for ch, idx in channels:
+                if ch == "rotation":
+                    if pb.rotation_mode == 'QUATERNION':
+                        bone_channels.extend([("rotation_quaternion", i) for i in range(4)])
+                    elif pb.rotation_mode == 'AXIS_ANGLE':
+                         bone_channels.extend([("rotation_axis_angle", i) for i in range(4)])
+                    else: # Euler
+                         bone_channels.extend([("rotation_euler", i) for i in range(3)])
+                else:
+                    bone_channels.append((ch, idx))
+            
+            # 3. Find Drivers
+            if not armature.animation_data or not armature.animation_data.drivers:
+                continue
+                
+            for ch_name, idx in bone_channels:
+                source_path = f'pose.bones["{pb.name}"].{ch_name}'
+                target_path = f'pose.bones["{mirror_name}"].{ch_name}'
+                
+                # Find Source FCurve
+                source_fc = None
+                for fc in armature.animation_data.drivers:
+                    if fc.data_path == source_path and fc.array_index == idx:
+                        source_fc = fc
+                        break
+                
+                if source_fc:
+                    # Remove existing
+                    try:
+                        armature.driver_remove(target_path, idx)
+                    except:
+                        pass
+                        
+                    # Create Target FCurve
+                    target_fc = armature.driver_add(target_path, idx)
+                    
+                    # Copy
+                    copy_driver_to_fcurve(source_fc, target_fc, self.invert_values)
+                    count += 1
+                    
+        self.report({'INFO'}, f"Mirrored {count} Pose Drivers")
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
 
 
 class BSETUP_OT_MirrorShapeAndDriver(bpy.types.Operator):
@@ -772,7 +1004,7 @@ class BSETUP_OT_MirrorShapeAndDriver(bpy.types.Operator):
             
         # 2. MIRROR DRIVER
         # Check if driver exists on source
-        success, msg = mirror_driver_logic(self, context, driver_obj, obj, source_key_name, new_key_block.name, self.invert_driver_values)
+        success, msg = mirror_shape_driver_logic(self, context, driver_obj, obj, source_key_name, new_key_block.name, self.invert_driver_values)
         
         if success:
             self.report({'INFO'}, f"Created & Mirrored '{new_key_block.name}'")
@@ -914,12 +1146,83 @@ class BSETUP_OT_CreateAsymShape(bpy.types.Operator):
         return {'FINISHED'}
 
 
+
+class BSETUP_OT_RemovePoseDriver(bpy.types.Operator):
+    """Remove drivers from selected bones based on active channels (Loc/Rot/Scale)"""
+    bl_idname = "bsetup.remove_pose_driver"
+    bl_label = "Remove Driver"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        props = context.scene.maya_shape_keys
+        
+        # Check if Pose Mode
+        if props.driven_type != 'POSE':
+             self.report({'WARNING'}, "Not in Pose Mode")
+             return {'CANCELLED'}
+             
+        # Check Selection
+        selected_bones = context.selected_pose_bones
+        if not selected_bones:
+             self.report({'WARNING'}, "No bones selected")
+             return {'CANCELLED'}
+             
+        # Collect channels to remove
+        channels = [] # (data_path_base, index)
+        if props.drive_location:
+            channels.extend([("location", 0), ("location", 1), ("location", 2)])
+        if props.drive_scale:
+            channels.extend([("scale", 0), ("scale", 1), ("scale", 2)])
+        if props.drive_rotation:
+             channels.append(("rotation", -1)) # Special handling per bone
+             
+        if not channels:
+             self.report({'WARNING'}, "No channels selected (Loc/Rot/Scale)")
+             return {'CANCELLED'}
+             
+        count = 0
+        for pb in selected_bones:
+            # Resolve Rotation Channels per bone
+            bone_channels = []
+            for ch, idx in channels:
+                if ch == "rotation":
+                    if pb.rotation_mode == 'QUATERNION':
+                        bone_channels.extend([("rotation_quaternion", i) for i in range(4)])
+                    elif pb.rotation_mode == 'AXIS_ANGLE':
+                         bone_channels.extend([("rotation_axis_angle", i) for i in range(4)])
+                    else: # Euler
+                         bone_channels.extend([("rotation_euler", i) for i in range(3)])
+                else:
+                    bone_channels.append((ch, idx))
+            
+            # Remove Drivers
+            # driver_remove(path, index=-1)
+            # data_path for bone driver is usually on the Object (Armature)
+            # path = 'pose.bones["Name"].location'
+            
+            armature = pb.id_data # The armature object
+            
+            for ch_name, idx in bone_channels:
+                path = f'pose.bones["{pb.name}"].{ch_name}'
+                try:
+                    # Remove driver
+                    success = armature.driver_remove(path, idx)
+                    if success: count += 1
+                except:
+                    pass
+                    
+        self.report({'INFO'}, f"Removed {count} drivers")
+        return {'FINISHED'}
+
+
 classes = (
     BSETUP_OT_LoadDriver,
     BSETUP_OT_UpdateDriverValue,
     BSETUP_OT_SnapDriverToValue,
     BSETUP_OT_LoadDriven,
     BSETUP_OT_AddDriverKey,
+    BSETUP_OT_RemovePoseDriver,
+    BSETUP_OT_MirrorPoseDriver,
     BSETUP_OT_AddComboShape,
     BSETUP_OT_CreateNamedShape,
     BSETUP_OT_CreateInBetween,

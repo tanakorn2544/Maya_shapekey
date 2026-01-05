@@ -114,13 +114,31 @@ class BSETUP_PT_DriverTool(bpy.types.Panel):
         
         col.prop(props, "driven_object", text="Object")
         
-        if props.driven_object:
-            if props.driven_object.data and hasattr(props.driven_object.data, "shape_keys") and props.driven_object.data.shape_keys:
-                 col.prop_search(props, "driven_key", props.driven_object.data.shape_keys, "key_blocks", text="Shape Key")
-            else:
-                col.label(text="No Shape Keys found", icon='ERROR')
-            
-            col.prop(props, "driven_value", text="Value")
+        # Type Toggle
+        row = col.row()
+        row.prop(props, "driven_type", expand=True)
+
+        if props.driven_type == 'KEY':
+            if props.driven_object:
+                if props.driven_object.data and hasattr(props.driven_object.data, "shape_keys") and props.driven_object.data.shape_keys:
+                     col.prop_search(props, "driven_key", props.driven_object.data.shape_keys, "key_blocks", text="Shape Key")
+                else:
+                    col.label(text="No Shape Keys found", icon='ERROR')
+                
+                col.prop(props, "driven_value", text="Value")
+                
+        elif props.driven_type == 'POSE':
+             col.label(text="Include Channels:", icon='CON_TRANSFORM')
+             row = col.row(align=True)
+             row.prop(props, "drive_location", toggle=True, text="Loc")
+             row.prop(props, "drive_rotation", toggle=True, text="Rot")
+             row.prop(props, "drive_scale", toggle=True, text="Scale")
+             
+             col.label(text="Select Bones to Drive", icon='BONE_DATA')
+             
+             row = col.row()
+             row.operator("bsetup.remove_pose_driver", text="Remove", icon='X')
+             row.operator("bsetup.mirror_pose_driver", text="Mirror", icon='MOD_MIRROR')
 
         # --- ACTION SECTION ---
         layout.separator()

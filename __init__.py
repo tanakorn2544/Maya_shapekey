@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Maya-Style Shape Key System",
     "author": "Korn Sensei",
-    "version": (1, 5),
+    "version": (1, 6),
     "blender": (4, 0, 0),
     "location": "View3D > Sidebar > Maya Shape Keys",
     "description": "Enhanced Shape Key system with Maya-like Set Driven Key functionality",
@@ -12,7 +12,7 @@ bl_info = {
 
 # Reload handling
 if "bpy" in locals():
-    import importlib
+    import importlib    
     if "properties" in locals():
         importlib.reload(properties)
     if "operators" in locals():

@@ -27,6 +27,20 @@ class DriverToolSettings(bpy.types.PropertyGroup):
         description="Name of the shape key to drive"
     )
 
+    driven_type: bpy.props.EnumProperty(
+        name="Driven Type",
+        items=[
+            ('KEY', "Shape Key", "Drive a Shape Key Value"),
+            ('POSE', "Pose", "Drive Bone Transforms"),
+        ],
+        default='KEY'
+    )
+    
+    # Pose Driving Channels
+    drive_location: bpy.props.BoolProperty(name="Location", default=False)
+    drive_rotation: bpy.props.BoolProperty(name="Rotation", default=True)
+    drive_scale: bpy.props.BoolProperty(name="Scale", default=False)
+
     # Values for "Set Key"
     driver_value: bpy.props.FloatProperty(name="Driver Value", default=0.0)
     driven_value: bpy.props.FloatProperty(name="Driven Value", default=0.0)
