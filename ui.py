@@ -102,6 +102,7 @@ class BSETUP_PT_DriverTool(bpy.types.Panel):
             row = col.row(align=True)
             row.prop(props, "driver_value", text="Current Val")
             row.operator("bsetup.update_driver_val", text="", icon='FILE_REFRESH')
+            row.operator("bsetup.snap_driver_val", text="", icon='IMPORT')
 
 
         # --- DRIVEN SECTION ---
@@ -127,6 +128,10 @@ class BSETUP_PT_DriverTool(bpy.types.Panel):
         row.scale_y = 1.4
         row.operator("bsetup.add_driver_key", text="Key Driver", icon='KEY_HLT')
         row.operator("bsetup.mirror_driver", text="Mirror", icon='MOD_MIRROR')
+        
+        layout.separator()
+        row = layout.row()
+        row.prop(props, "driver_interpolation", expand=True)
 
 
 class BSETUP_PT_ShapeEditor(bpy.types.Panel):
@@ -176,7 +181,9 @@ class BSETUP_PT_ShapeEditor(bpy.types.Panel):
         box.use_property_split = True
         col = box.column(align=True)
         col.label(text="Asymmetry / Split", icon='MESH_DATA')
-        col.operator("bsetup.create_asym_shape", text="Create Asym Shape", icon='ADD')
+        row = col.row(align=True)
+        row.prop(props, "asym_shape_name", text="")
+        row.operator("bsetup.create_asym_shape", text="Create Asym Shape", icon='ADD')
         col.operator("bsetup.split_shape", text="Split Active Shape L/R")
         
         # Combo

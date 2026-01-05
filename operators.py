@@ -65,6 +65,67 @@ class BSETUP_OT_UpdateDriverValue(bpy.types.Operator):
              
         return {'FINISHED'}
 
+class BSETUP_OT_SnapDriverToValue(bpy.types.Operator):
+    """Snap the driver object to the current 'Driver Value'"""
+    bl_idname = "bsetup.snap_driver_val"
+    bl_label = "Snap Driver"
+    bl_icon = 'IMPORT'
+    
+    def execute(self, context):
+        props = context.scene.maya_shape_keys
+        val = props.driver_value
+        obj = props.driver_target
+        
+        if not obj: return {'CANCELLED'}
+        
+        target = obj
+        if obj.type == 'ARMATURE' and props.driver_bone:
+             pb = obj.pose.bones.get(props.driver_bone)
+             if pb: target = pb
+        
+        path = props.driver_data_path
+        
+        try:
+            if "[" in path and path.endswith("]"):
+                # Handle Array/Vector access: location[0], rotation_euler[1]
+                # Split at last '[' to handle nested arrays if ever needed (though rare here)
+                base, idx_s = path.rsplit("[", 1)
+                idx = int(idx_s.replace("]", ""))
+                
+                # Resolve base property (e.g. 'location' -> Vector object)
+                # path_resolve works relative to target
+                vec = target.path_resolve(base)
+                vec[idx] = val
+            else:
+                # Handle Attributes or Custom Props
+                try:
+                    # Check if standard attribute
+                    # But path_resolve is safer for nested attributes e.g. 'sub.attr'
+                    # Setting via setattr(target, path, val) only works for direct attributes
+                    # For a generic 'Snap back', we assume simple paths mostly.
+                    # But let's try the key access for Custom Props first as fallback
+                    if hasattr(target, path):
+                         setattr(target, path, val)
+                    else:
+                         target[path] = val
+                         
+                    # For more complex nested paths (game_settings.sub_prop) not fully handled 
+                    # efficiently here without resolving parent, but this covers user request 
+                    # for transforms/custom props.
+                except:
+                     # Fallback for things that look like attributes but behave like props
+                     target[path] = val
+                     
+            # Force update
+            obj.update_tag()
+            self.report({'INFO'}, f"Snapped {path} to {val:.3f}")
+            
+        except Exception as e:
+            self.report({'ERROR'}, f"Failed to snap: {e}")
+            return {'CANCELLED'}
+            
+        return {'FINISHED'}
+
 class BSETUP_OT_LoadDriven(bpy.types.Operator):
     """Load the selected object shape key as the driven"""
     bl_idname = "bsetup.load_driven"
@@ -274,10 +335,18 @@ class BSETUP_OT_AddDriverKey(bpy.types.Operator):
         for mod in fcurve.modifiers:
             fcurve.modifiers.remove(mod)
             
-        fcurve.keyframe_points.insert(current_driver_val, current_driven_val)
+        # Create key
+        kp_driver = fcurve.keyframe_points.insert(current_driver_val, current_driven_val)
+        
+        # Apply Interpolation
+        kp_driver.interpolation = props.driver_interpolation
+        if props.driver_interpolation == 'BEZIER':
+            kp_driver.handle_left_type = 'AUTO_CLAMPED'
+            kp_driver.handle_right_type = 'AUTO_CLAMPED'
+            
         fcurve.update()
 
-        self.report({'INFO'}, f"Keyed {props.driven_key} at {current_driven_val:.2f} (Driver: {current_driver_val:.2f})")
+        self.report({'INFO'}, f"Keyed {props.driven_key} at {current_driven_val:.2f} (Driver: {current_driver_val:.2f}) [{props.driver_interpolation}]")
         return {'FINISHED'}
 
 class BSETUP_OT_AddComboShape(bpy.types.Operator):
@@ -825,8 +894,14 @@ class BSETUP_OT_CreateAsymShape(bpy.types.Operator):
             obj.shape_key_add(name="Basis")
             
         # Create new key
-        key = obj.shape_key_add(name="AsymShape", from_mix=False)
+        props = context.scene.maya_shape_keys
+        name = props.asym_shape_name if props.asym_shape_name else "AsymShape"
+        
+        key = obj.shape_key_add(name=name, from_mix=False)
         key.value = 0.0
+        
+        # Clear name
+        props.asym_shape_name = ""
         
         # Select it
         obj.active_shape_key_index = obj.data.shape_keys.key_blocks.find(key.name)
@@ -842,6 +917,7 @@ class BSETUP_OT_CreateAsymShape(bpy.types.Operator):
 classes = (
     BSETUP_OT_LoadDriver,
     BSETUP_OT_UpdateDriverValue,
+    BSETUP_OT_SnapDriverToValue,
     BSETUP_OT_LoadDriven,
     BSETUP_OT_AddDriverKey,
     BSETUP_OT_AddComboShape,

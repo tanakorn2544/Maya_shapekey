@@ -49,6 +49,7 @@ A dedicated list view and toolkit for managing shape keys.
 ### 5. Asymmetry / Split Tools
 New workflow for asymmetrical meshes or complex sculpting.
 *   **Create Asym Shape**:
+    *   **Name Field**: Enter a name to customize your new shape key (default: `AsymShape`).
     *   Creates a new shape key and **automatically enables X-Mirror and Topology Mirror** on your mesh.
     *   Allows symmetric sculpting on asymmetrical geometry.
 *   **Split Active Shape L/R**:
@@ -69,8 +70,9 @@ New workflow for asymmetrical meshes or complex sculpting.
 7.  **Mirror**: Click **Mirror Shape & Driver** to instantly create the opposite side setup.
 
 ## Workflow: Asymmetrical Character
-1.  Click **Create Asym Shape**.
-2.  Sculpt your expression (e.g. a Smile) on BOTH sides at once (thanks to auto-topology mirror).
-3.  When finished, click **Split Active Shape L/R**.
-4.  The addon creates `AsymShape_L` and `AsymShape_R` for you.
-5.  Set Drivers for these new split shapes as usual.
+1.  (Optional) Enter a name for the shape.
+2.  Click **Create Asym Shape**.
+3.  Sculpt your expression (e.g. a Smile) on BOTH sides at once (thanks to auto-topology mirror).
+4.  When finished, click **Split Active Shape L/R**.
+5.  The addon creates `AsymShape_L` and `AsymShape_R` for you.
+6.  Set Drivers for these new split shapes as usual.

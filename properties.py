@@ -43,6 +43,19 @@ class DriverToolSettings(bpy.types.PropertyGroup):
     ib_source: bpy.props.StringProperty(name="Parent Shape", description="Shape key to add in-between for")
     ib_value: bpy.props.FloatProperty(name="Trigger Value", default=0.5, min=0.0, max=1.0)
 
+    # Asymmetry Tool
+    asym_shape_name: bpy.props.StringProperty(name="Asym Shape Name", description="Name for the asymmetrical shape key")
+
+    driver_interpolation: bpy.props.EnumProperty(
+        name="Interpolation",
+        items=[
+            ('LINEAR', "Linear", "Straight lines (Linear)", 'IPO_LINEAR', 0),
+            ('BEZIER', "Smooth", "Smooth falloff (Bezier)", 'IPO_BEZIER', 1),
+            ('CONSTANT', "Step", "Instant change (Constant)", 'IPO_CONSTANT', 2),
+        ],
+        default='LINEAR'
+    )
+
 def register():
     # Handle re-registration (reload scripts)
     try:
