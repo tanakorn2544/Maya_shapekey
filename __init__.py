@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Maya-Style Shape Key System",
     "author": "Korn Sensei",
-    "version": (1, 6),
+    "version": (1, 7),
     "blender": (4, 0, 0),
     "location": "View3D > Sidebar > Maya Shape Keys",
     "description": "Enhanced Shape Key system with Maya-like Set Driven Key functionality",
@@ -19,10 +19,18 @@ if "bpy" in locals():
         importlib.reload(operators)
     if "ui" in locals():
         importlib.reload(ui)
+    if "hud" in locals():
+        # Clean up existing handler before reload to avoid duplicates
+        try:
+            hud.remove_handler()
+        except:
+            pass
+        importlib.reload(hud)
 else:
     from . import properties
     from . import operators
     from . import ui
+    from . import hud
 
 import bpy
 import bpy.utils.previews
@@ -50,6 +58,7 @@ def register():
 
 def unregister():
     # Remove icons first
+    hud.remove_handler()
     for pcoll in preview_collections.values():
         bpy.utils.previews.remove(pcoll)
     preview_collections.clear()

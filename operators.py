@@ -1047,34 +1047,38 @@ class BSETUP_OT_SplitShape(bpy.types.Operator):
         
         # Get or Create Groups
         vg_l = obj.vertex_groups.get(group_l_name)
-        if not vg_l: vg_l = obj.vertex_groups.new(name=group_l_name)
+        create_l = False
+        if not vg_l: 
+            vg_l = obj.vertex_groups.new(name=group_l_name)
+            create_l = True
         
         vg_r = obj.vertex_groups.get(group_r_name)
-        if not vg_r: vg_r = obj.vertex_groups.new(name=group_r_name)
+        create_r = False
+        if not vg_r: 
+            vg_r = obj.vertex_groups.new(name=group_r_name)
+            create_r = True
         
-        # Determine indices
-        # We perform this in Object Mode (implied) to access data safely
-        mesh = obj.data
-        
-        # Prepare lists
-        indices_l = []
-        indices_r = []
-        
-        # Simple threshold check
-        t = self.threshold
-        for v in mesh.vertices:
-            if v.co.x >= -t: # Include 0 or near 0 in Left
-                indices_l.append(v.index)
-            else:
-                indices_r.append(v.index)
-                
-        # Clear existing weights in these groups to be safe
-        obj.vertex_groups[group_l_name].remove([v.index for v in mesh.vertices])
-        obj.vertex_groups[group_r_name].remove([v.index for v in mesh.vertices])
-        
-        # Assign new weights
-        if indices_l: vg_l.add(indices_l, 1.0, 'REPLACE')
-        if indices_r: vg_r.add(indices_r, 1.0, 'REPLACE')
+        # Only calculate if we created a new group (presumably empty)
+        if create_l or create_r:
+            # Determine indices
+            # We perform this in Object Mode (implied) to access data safely
+            mesh = obj.data
+            
+            # Prepare lists
+            indices_l = []
+            indices_r = []
+            
+            # Simple threshold check
+            t = self.threshold
+            for v in mesh.vertices:
+                if v.co.x >= -t: # Include 0 or near 0 in Left
+                    if create_l: indices_l.append(v.index)
+                else:
+                    if create_r: indices_r.append(v.index)
+                    
+            # Assign new weights
+            if create_l and indices_l: vg_l.add(indices_l, 1.0, 'REPLACE')
+            if create_r and indices_r: vg_r.add(indices_r, 1.0, 'REPLACE')
         
         # 2. CREATE SPLIT KEYS
         key_blocks = obj.data.shape_keys.key_blocks

@@ -53,6 +53,8 @@ class BSETUP_PT_DriverTool(bpy.types.Panel):
                     self.layout.label(text="", icon_value=icon.icon_id)
         except:
             pass
+        
+        self.layout.prop(context.scene.maya_shape_keys, "show_hud", text="", icon='INFO', emboss=False)
 
     def draw(self, context):
         layout = self.layout
@@ -109,14 +111,14 @@ class BSETUP_PT_DriverTool(bpy.types.Panel):
         layout.separator()
         box = layout.box()
         col = box.column(align=True)
-        col.label(text="Driven", icon='SHAPEKEY_DATA')
+        
+        row = col.row(align=True)
+        row.label(text="Driven", icon='SHAPEKEY_DATA')
+        row.prop(props, "driven_type", expand=True)
+        
         col.separator()
         
         col.prop(props, "driven_object", text="Object")
-        
-        # Type Toggle
-        row = col.row()
-        row.prop(props, "driven_type", expand=True)
 
         if props.driven_type == 'KEY':
             if props.driven_object:

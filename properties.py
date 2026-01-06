@@ -1,4 +1,13 @@
+
 import bpy
+
+
+def update_hud(self, context):
+    try:
+        from . import hud
+        hud.toggle_hud_update(self, context)
+    except ImportError:
+        pass
 
 class DriverToolSettings(bpy.types.PropertyGroup):
     # Driver Side
@@ -68,6 +77,13 @@ class DriverToolSettings(bpy.types.PropertyGroup):
             ('CONSTANT', "Step", "Instant change (Constant)", 'IPO_CONSTANT', 2),
         ],
         default='LINEAR'
+    )
+
+    show_hud: bpy.props.BoolProperty(
+        name="Show Info HUD",
+        description="Display the addon status on the left of the viewport",
+        default=False,
+        update=update_hud
     )
 
 def register():
