@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Maya-Style Shape Key System",
     "author": "Korn Sensei",
-    "version": (1, 7),
+    "version": (1, 8),
     "blender": (4, 0, 0),
     "location": "View3D > Sidebar > Maya Shape Keys",
     "description": "Enhanced Shape Key system with Maya-like Set Driven Key functionality",
