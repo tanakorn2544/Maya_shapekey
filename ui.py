@@ -44,21 +44,23 @@ class BSETUP_PT_DriverTool(bpy.types.Panel):
     bl_order = 0
 
     def draw_header(self, context):
+        layout = self.layout
+        layout.prop(context.scene.maya_shape_keys, "show_hud", text="", icon='INFO', emboss=False)
+        layout.popover(panel="BSETUP_PT_ColorSettings", text="", icon='PREFERENCES')
+        
         try:
             from . import preview_collections
             pcoll = preview_collections.get("main")
             if pcoll:
                 icon = pcoll.get("MAIN_ICON")
                 if icon:
-                    self.layout.label(text="", icon_value=icon.icon_id)
+                    layout.label(text="", icon_value=icon.icon_id)
         except:
             pass
-        
-        self.layout.prop(context.scene.maya_shape_keys, "show_hud", text="", icon='INFO', emboss=False)
 
     def draw(self, context):
         layout = self.layout
-        layout.use_property_split = True
+        layout.use_property_split= True
         layout.use_property_decorate = False  # Cleaner
         
         scene = context.scene
@@ -235,10 +237,27 @@ class BSETUP_PT_ShapeEditor(bpy.types.Panel):
             col.label(text="Need Shape Keys", icon='INFO')
 
 
+
+class BSETUP_PT_ColorSettings(bpy.types.Panel):
+    bl_label = "Highlight Colors"
+    bl_idname = "BSETUP_PT_ColorSettings"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'WINDOW'
+
+    def draw(self, context):
+        layout = self.layout
+        props = context.scene.maya_shape_keys
+        layout.label(text="Driver Highlight")
+        layout.prop(props, "highlight_color_driver", text="")
+        layout.separator()
+        layout.label(text="Driven Highlight")
+        layout.prop(props, "highlight_color_driven", text="")
+
 classes = (
     BSETUP_UL_ShapeKeyList,
     BSETUP_PT_DriverTool,
     BSETUP_PT_ShapeEditor,
+    BSETUP_PT_ColorSettings,
 )
 
 def register():

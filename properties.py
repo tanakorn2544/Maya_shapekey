@@ -85,6 +85,23 @@ class DriverToolSettings(bpy.types.PropertyGroup):
         default=False,
         update=update_hud
     )
+    
+    # Visualization Colors
+    highlight_color_driver: bpy.props.FloatVectorProperty(
+        name="Driver Color",
+        subtype='COLOR',
+        default=(0.0, 1.0, 1.0), # Cyan
+        min=0.0, max=1.0,
+        description="Color for the Driver highlight (Bone/Object)"
+    )
+    
+    highlight_color_driven: bpy.props.FloatVectorProperty(
+        name="Driven Color",
+        subtype='COLOR',
+        default=(1.0, 0.5, 0.0), # Orange
+        min=0.0, max=1.0,
+        description="Color for the Driven Shape highlight"
+    )
 
 def register():
     # Handle re-registration (reload scripts)
