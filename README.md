@@ -1,6 +1,6 @@
 # Maya-Style Shape Key System (Blender Addon)
 **Author:** Korn Sensei  
-**Version:** 1.8  
+**Version:** 1.9  
 **Blender Compatibility:** 4.0+
 
 ## Overview
