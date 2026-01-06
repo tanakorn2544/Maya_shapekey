@@ -269,6 +269,45 @@ class DrawHUD:
                     gpu.state.face_culling_set('NONE')
                     gpu.state.blend_set('NONE')
                     gpu.state.depth_test_set('LESS')
+                    
+        # 3. Driven Pose (Bones)
+        if props.driven_object and props.driven_type == 'POSE' and props.driven_object.type == 'ARMATURE':
+            obj = props.driven_object
+            # Find selected bones (even if object not active, selection state persists)
+            # We want to use 'pb.bone.select' which mirrors the edit/pose selection
+            
+            lines = []
+            points = []
+            
+            if obj.pose and obj.pose.bones:
+                for pb in obj.pose.bones:
+                    # Check selection: pb.bone.select is reliable for Pose Mode selection
+                    if pb.bone.select:
+                        p1 = obj.matrix_world @ pb.head
+                        p2 = obj.matrix_world @ pb.tail
+                        lines.append(p1)
+                        lines.append(p2)
+                        points.append(p1)
+            
+            if lines:
+                shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+                gpu.state.blend_set('ALPHA')
+                gpu.state.line_width_set(3.0)
+                gpu.state.depth_test_set('NONE')
+                
+                batch = batch_for_shader(shader, 'LINES', {"pos": lines})
+                shader.bind()
+                shader.uniform_float("color", driven_color)
+                batch.draw(shader)
+                
+                gpu.state.point_size_set(10)
+                batch_pt = batch_for_shader(shader, 'POINTS', {"pos": points})
+                batch_pt.draw(shader)
+                
+                gpu.state.depth_test_set('LESS')
+                gpu.state.line_width_set(1.0)
+                gpu.state.point_size_set(1.0)
+                gpu.state.blend_set('NONE')
 
     def update_cache(self, obj, key_name, driver_obj_ref=None):
         self.cache_obj = obj

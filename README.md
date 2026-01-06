@@ -34,11 +34,11 @@ The core "Driver/Key" workflow.
 A powerful new overlay system to visualize your rigging relationships directly in the 3D Viewport.
 *   **Toggle**: Click the **"Show HUD"** button at the top of the panel to enable/disable.
 *   **Driven Highlight**:
-    *   Highlights the **Evaluated Mesh** faces affected by the current shape key.
-    *   **Live Updates**: Updates in real-time during Sculpt or Edit mode (optimized with Numpy).
-    *   **Smart Side Filtering**: Automatically filters the highlight to Left/Right sides if the shape key name contains `_L`, `_R`, `.L`, `.R`, ensuring clean visualization for mirrored shapes.
-    *   **X-Ray Overlay**: Draws cleanly over the mesh without Z-fighting or clipping.
-    *   **Ghosting Fix**: Correctly follows the deformed (rigged) mesh, ensuring the highlight sticks to the character.
+    *   **Shape Keys**: Highlights the **Evaluated Mesh** faces affected by the current shape key.
+        *   **Live Updates**: Updates in real-time during Sculpt or Edit mode (optimized with Numpy).
+        *   **Smart Side Filtering**: Automatically filters the highlight to Left/Right sides if the shape key name contains `_L`, `_R`, `.L`, `.R`, ensuring clean visualization for mirrored shapes.
+        *   **X-Ray Overlay**: Draws cleanly over the mesh without Z-fighting or clipping.
+    *   **Pose Mode**: Highlights the **Selected Bones** on the driven armature (in Orange/Custom Color) to clearly identify which bones are currently being targeted.
 *   **Driver Highlight**:
     *   Draws a visual line and point on the Driver Bone/Object, making it easy to see what is driving the deformation.
 *   **Custom Colors**:
@@ -90,7 +90,7 @@ New workflow for asymmetrical meshes or complex sculpting.
 1.  **Select your Mesh or Armature**.
 2.  Open the **N-Panel (Sidebar)** in the 3D Viewport and find the **Maya Shape Keys** tab.
 3.  **Set the Driver**: Select your Armature, pick a bone, and click the Eyedropper.
-4.  **Create a Shape** (if Mesh) or **Select Bones** (if Armature).
+4.  **Create a Shape** (if Mesh) or **Select Bones** (if Armature & Set Driven Key panel set to Pose).
 5.  **Enable HUD**: Click "Show HUD" to visualize the driver and driven areas. Check colors via the Gear icon.
 6.  **Key it**:
     *   Move the driver bone to the activation point.
