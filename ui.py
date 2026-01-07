@@ -138,10 +138,46 @@ class BSETUP_PT_DriverTool(bpy.types.Panel):
              row.prop(props, "drive_rotation", toggle=True, text="Rot")
              row.prop(props, "drive_scale", toggle=True, text="Scale")
              
-             col.label(text="Select Bones to Drive", icon='BONE_DATA')
+             col.separator()
+             col.prop(props, "pose_action_name", text="Action Name")
              
-             row = col.row()
-             row.operator("bsetup.remove_pose_driver", text="Remove", icon='X')
+             col.label(text="Active SDK Stack (Active Bone)", icon='CONSTRAINT')
+             box = col.box()
+             
+             active_pb = context.active_pose_bone
+             if active_pb:
+                 found_any = False
+                 for const in active_pb.constraints:
+                     if const.type == 'ACTION' and const.name.startswith("SDK"):
+                         found_any = True
+                         row = box.row()
+                         
+                         # Determine Display Name & Suffix
+                         display_name = const.name
+                         suffix = ""
+                         
+                         if const.name.startswith("SDK_"):
+                             suffix = const.name[4:] # Remove SDK_
+                             display_name = suffix
+                         elif const.name == "SDK":
+                             display_name = "(Default)"
+                             
+                         if not display_name: display_name = const.name
+                         
+                         row.label(text=display_name, icon='ACTION')
+                         
+                         # Select Button
+                         op_sel = row.operator("bsetup.select_driven_bones", text="", icon='RESTRICT_SELECT_OFF')
+                         op_sel.target_name = suffix
+                         
+                         # Remove Button
+                         op = row.operator("bsetup.remove_pose_driver", text="", icon='X')
+                         op.target_name = suffix
+                 
+                 if not found_any:
+                     box.label(text="No SDK Constraints", icon='INFO')
+             else:
+                 box.label(text="Select a Pose Bone", icon='INFO')
 
         # --- ACTION SECTION ---
         layout.separator()

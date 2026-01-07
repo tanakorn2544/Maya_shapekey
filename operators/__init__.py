@@ -13,6 +13,7 @@ from .driver_ops import (
 from .pose_ops import (
     BSETUP_OT_MirrorPoseDriver,
     BSETUP_OT_RemovePoseDriver,
+    BSETUP_OT_SelectDrivenBones,
 )
 
 from .shape_ops import (
@@ -20,7 +21,6 @@ from .shape_ops import (
     BSETUP_OT_CreateNamedShape,
     BSETUP_OT_CreateInBetween,
     BSETUP_OT_SplitShape,
-    BSETUP_OT_CreateAsymShape,
     BSETUP_OT_CreateAsymShape,
     BSETUP_OT_MirrorShapeAndDriver,
 )
@@ -38,13 +38,13 @@ classes = (
     BSETUP_OT_AddDriverKey,
     BSETUP_OT_RemovePoseDriver,
     BSETUP_OT_MirrorPoseDriver,
+    BSETUP_OT_SelectDrivenBones,
     BSETUP_OT_AddComboShape,
     BSETUP_OT_CreateNamedShape,
     BSETUP_OT_CreateInBetween,
     BSETUP_OT_SetChannel,
     BSETUP_OT_MirrorDriver,
     BSETUP_OT_MirrorShapeAndDriver,
-    BSETUP_OT_SplitShape,
     BSETUP_OT_SplitShape,
     BSETUP_OT_CreateAsymShape,
     BSETUP_OT_CheckForUpdates,

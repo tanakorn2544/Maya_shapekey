@@ -472,7 +472,11 @@ class BSETUP_OT_RemovePoseDriver(bpy.types.Operator):
     """Remove drivers from selected bones based on active channels (Loc/Rot/Scale)"""
     bl_idname = "bsetup.remove_pose_driver"
     bl_label = "Remove Driver"
+    bl_label = "Remove Driver"
     bl_options = {'REGISTER', 'UNDO'}
+    
+    # Optional property for targeted removal via UI List
+    target_name: bpy.props.StringProperty(name="Target Name", default="")
     
     def execute(self, context):
         props = context.scene.maya_shape_keys
@@ -544,9 +548,21 @@ class BSETUP_OT_RemovePoseDriver(bpy.types.Operator):
                 is_sdk = const.name.startswith("SDK") 
                 
                 if is_sdk:
-                    # SIMPLIFIED LOGIC: If checking ALL (default), just mark it.
-                    # Or check blindly.
-                    constraints_to_remove.append(const)
+                    # Targeted Removal Logic
+                    # Priority: Operator Arg > Props Text Field > All
+                    
+                    target_suffix = self.target_name.strip()
+                    if not target_suffix:
+                         target_suffix = props.pose_action_name.strip() if hasattr(props, "pose_action_name") else ""
+                    
+                    if target_suffix:
+                        # Only remove exact match
+                        target_full_name = f"SDK_{target_suffix}"
+                        if const.name == target_full_name:
+                            constraints_to_remove.append(const)
+                    else:
+                        # Remove ALL SDK constraints (Default/Legacy)
+                        constraints_to_remove.append(const)
                     
                     # NOTE: We skip the channel check because it seems to be fragile 
                     # and the user just wants the SDK gone.
@@ -565,4 +581,59 @@ class BSETUP_OT_RemovePoseDriver(bpy.types.Operator):
                 count += 1
                         
         self.report({'INFO'}, f"Removed {count} SDK Constraints and {actions_removed} Actions")
+        return {'FINISHED'}
+
+
+class BSETUP_OT_SelectDrivenBones(bpy.types.Operator):
+    """Select bones that have the specific SDK Action assigned"""
+    bl_idname = "bsetup.select_driven_bones"
+    bl_label = "Select Driven Bones"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    target_name: bpy.props.StringProperty(name="Target Name", default="")
+    
+    def execute(self, context):
+        props = context.scene.maya_shape_keys
+        
+        # Check if Pose Mode
+        if props.driven_type != 'POSE':
+             self.report({'WARNING'}, "Not in Pose Mode")
+             return {'CANCELLED'}
+             
+        # Find Armature
+        arm_obj = None
+        if props.driven_object and props.driven_object.type == 'ARMATURE':
+            arm_obj = props.driven_object
+        elif context.active_object and context.active_object.type == 'ARMATURE':
+            arm_obj = context.active_object
+            
+        if not arm_obj:
+             self.report({'WARNING'}, "No Armature found")
+             return {'CANCELLED'}
+             
+        if not self.target_name:
+             self.report({'WARNING'}, "No Action Name specified")
+             return {'CANCELLED'}
+             
+        target_full_name = f"SDK_{self.target_name}"
+        count = 0
+        
+        # Iterate all bones
+        if arm_obj.mode == 'POSE':
+             for pb in arm_obj.pose.bones:
+                found = False
+                for const in pb.constraints:
+                    if const.type == 'ACTION' and const.name == target_full_name:
+                        found = True
+                        break
+                
+                if found:
+                    pb.bone.select = True
+                    count += 1
+        
+        if count > 0:
+            self.report({'INFO'}, f"Selected {count} bones with action '{self.target_name}'")
+        else:
+            self.report({'WARNING'}, f"No bones found with action '{self.target_name}'")
+            
         return {'FINISHED'}

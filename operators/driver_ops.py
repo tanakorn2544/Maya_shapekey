@@ -369,9 +369,15 @@ class BSETUP_OT_AddDriverKey(bpy.types.Operator):
     def _setup_action_driver(self, driven_obj, driven_pb, driver_obj, props, driver_id, driver_val, values_map):
         """Create Action, Constraint, and Keys"""
         
-        # 1. Naming (Moved to top)
-        constraint_name = f"SDK_{driver_id}"
-        action_name = f"SDK_ACT_{driven_pb.name}_{driver_id}"
+        # 1. Naming - Use custom name if provided, otherwise auto-generate
+        custom_name = props.pose_action_name.strip() if hasattr(props, "pose_action_name") else ""
+        
+        if custom_name:
+            constraint_name = f"SDK_{custom_name}"
+            action_name = f"SDK_ACT_{custom_name}"
+        else:
+            constraint_name = f"SDK_{driver_id}"
+            action_name = f"SDK_ACT_{driven_pb.name}_{driver_id}"
         
         print(f"[DEBUG] Starting Action Setup. Action Name: {action_name}")
         

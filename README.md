@@ -1,101 +1,77 @@
-# Maya-Style Shape Key System (Blender Addon)
-**Author:** Korn Sensei  
-**Version:** 2.2  
-**Blender Compatibility:** 4.0+
+# Maya-Style Shape Key System (v2.3)
 
-## New in 2.2
-- **Robust Mirror Driver Fix**: Completely overhauled the "Mirror Pose Driver" logic to handle complex bone naming conventions (e.g., `Bone_L.001`) and "safety check" regressions. The system now intelligently verifies identifying targets to ensure perfect mirroring every time.
-- **Enhanced Name Flipping**: Improved fallback mechanisms for identifying left/right bone pairs when standard naming conventions are ambiguous.
-
-## New in 2.1
-- **Expression-Based Pose Drivers**: Switched from Action Constraint curves to optimized Scripted Expressions (`clamp(...)`) for Location/Rotation/Scale driving. Faster, cleaner, and more robust.
-- **Improved Mirroring**: Pose Driver mirroring now handles expression inversion automatically and accurately flips Bone Targets even without keyframe data.
+Enhanced Shape Key system for Blender 4.0+. This addon replicates the powerful "Set Driven Key" workflow from Maya, allowing you to drive Shape Keys or Bone Poses using Driver Bones with ease.
 
 ## Features
 
-### 1. Set Driven Key Panel
-The core "Driver/Key" workflow.
-*   **Driver Object**: Select the object (and Bone) that controls the animation.
-    *   **Quick Assign**: Use the Eyedropper button to instantly load the selected object as the driver.
-*   **Quick Channels**: One-click buttons to set the driver path to standard transforms (Location X/Y/Z, Rotation, Scale).
-*   **Driven Settings**:
-    *   **Driven Object**: Select the mesh or armature to drive.
-    *   **Type Toggle**: Switch between **Shape Key** and **Pose** driving.
-*   **Key Driver**: Creates a driver curve relationship.
-    *   **Shape Key Mode**: Select a shape key and key it at a specific value.
-    *   **Pose Mode**: Select **multiple bones** and drive their **Location, Rotation, or Scale** simultaneously.
-*   **Interpolation Control**:
-    *   Choose between **Linear**, **Smooth (Bezier)**, or **Step (Constant)** interpolation for your driver curves directly from the panel.
+- **Set Driven Keys (Maya Style)**: Select Driver Bone -> Select Driven Object/Bone -> "Key Driver". It automatically sets up the driver, variables, and curves.
+- **Pose Drivers (Action Constraints)**: Drive entire bone poses (Location, Rotation, Scale) using Action Constraints.
+- **Action Stacking & Naming**:
+    - **Stack Actions**: Apply multiple drivers to a single bone.
+    - **Naming**: Give custom names to your actions (e.g., "JawOpen", "HeadTilt") to keep organized.
+    - **Stack List Panel**: See all active SDK actions on a bone, remove used ones, or select all bones using a specific action.
+- **Mirroring**:
+    - **Mirror Drivers**: Instantly mirror setups from Left to Right (e.g., EyePuff.L -> EyePuff.R).
+    - **Mirror Shapes**: Create asymmetrical shape keys and mirror them.
+- **Visual HUD**:
+    - **Viewport Overlay**: Shows which bone is the active Driver and what it is driving.
+    - **Customizable**: Adjust Font Size, Line Width, and Colors in the "HUD Settings" panel (Gear icon).
+- **Shape Key Tools**:
+    - **Combo Shapes**: Easily create corrective shapes (e.g., "Smile + Blink").
+    - **In-Between Shapes**: Create breakdown shapes at specific values.
+    - **Split Shapes**: Split a shape key into Left/Right halves (vertex group based).
 
-### 2. Live Visualization System (HUD)
-A powerful new overlay system to visualize your rigging relationships directly in the 3D Viewport.
-*   **Toggle**: Click the **"Show HUD"** button at the top of the panel to enable/disable.
-*   **Driven Highlight**:
-    *   **Shape Keys**: Highlights the **Evaluated Mesh** faces affected by the current shape key.
-        *   **Live Updates**: Updates in real-time during Sculpt or Edit mode (optimized with Numpy).
-        *   **Smart Side Filtering**: Automatically filters the highlight to Left/Right sides if the shape key name contains `_L`, `_R`, `.L`, `.R`, ensuring clean visualization for mirrored shapes.
-        *   **X-Ray Overlay**: Draws cleanly over the mesh without Z-fighting or clipping.
-    *   **Pose Mode**: Highlights the **Selected Bones** on the driven armature (in Orange/Custom Color) to clearly identify which bones are currently being targeted.
-*   **Driver Highlight**:
-    *   Draws a visual line and point on the Driver Bone/Object, making it easy to see what is driving the deformation.
-*   **Custom Colors**:
-    *   Click the **Gear Icon** in the panel header to open the settings.
-    *   Customize both **Driver Color** (Default: Cyan) and **Driven Color** (Default: Orange) to your liking.
+## Installation
 
-### 3. Bone Driving (Pose Mode)
-Drive armature bones directly, similar to driving shape keys.
-*   **Select Bones**: Select the bones you want to drive in the viewport.
-*   **Choose Channels**: Toggle `Loc`, `Rot`, or `Scale` in the UI to determine which attributes to drive.
-*   **Batch Keying**: Clicking "Key Driver" applies the driver to all selected bones for the active channels.
-    *   **Smart Expressions**: Now uses a robust `clamp` expression (e.g. `clamp((var-0)/1, 0, 1)`) instead of keyframes. This ensures predictable 0-1 influence control and cleaner data.
-*   **Remove Driver**: Select bones and click "Remove" to delete drivers for the active channels.
-*   **Mirror Pose Driver**:
-    *   Select driven bones on one side (e.g. `Finger.L`).
-    *   Click **Mirror** to replicate the driver to the opposite side (`Finger.R`).
-    *   **Smart Flipping**: Automatically flips the **Driver Target** too (e.g. if `Ctrl.L` drives `Finger.L`, then `Ctrl.R` will drive `Finger.R`). Supports complex naming (`L_Bone`, `.L`, `Left`, etc.).
-    *   **Auto Inversion**: Intelligent handling of mirror axes (e.g. Location X), automatically generating inverted expressions (e.g. `-var`).
+1. Download the `maya_shape_keys.zip` file.
+2. In Blender, go to **Edit > Preferences > Add-ons**.
+3. Click **Install...** and select the zip file.
+4. Enable the add-on by checking the box.
 
-### 4. Shape Editor
-A dedicated list view and toolkit for managing shape keys.
-*   **Enhanced List**: Displays Shape Key Name, Value, and a "Driver" icon if a driver is present.
-*   **Load as Driven**: Quickly load any shape key from the list into the "Driven" slot with a single click.
+## Tutorial / How-To
 
-### 5. Creation Tools
-*   **Create New**: Easily create named shape keys.
-*   **Combo / Corrective Shapes**: Create a new shape key driven by the product of two other shapes (e.g., `MouthUp` * `Smile` = `SmileCorrective`).
-*   **In-Between Shapes**: Create corrective shapes that trigger at specific values of a parent shape (e.g., a roadmap for eyelid deformation).
+### 1. Basic Shape Key Driving
+1. Go to **Pose Mode**. Select your **Driver Bone** (e.g., a controller).
+2. Shift-Select your **Mesh** (the one with shape keys).
+3. In the Sidebar (N-Panel) > **Maya Shape Keys**:
+    - Click **Load Driver** (if not auto-loaded).
+    - Checks "Shape Key" mode.
+    - Select the **Shape Key** you want to drive from the dropdown.
+    - Move your bone to the "Active" position.
+    - Set the **Value** slider to 1.0 (or desired value).
+    - Click **Key Driver**.
+    - Result: Moving the bone now drives the shape key!
 
-### 6. Smart Mirroring
-*   **Mirror Shape & Driver**: The ultimate time-saver.
-    *   Takes an existing Shape Key (e.g., `Smile_L`).
-    *   Creates the geometric mirror (`Smile_R`).
-    *   **Automatically mirrors the Driver**:
-        *   Flips Bone targets (`Jaw_L` -> `Jaw_R`).
-        *   Supports standard naming conventions: `.L/.R`, `_L/_R`, `L_/R_`, `Left/Right`.
-        *   **Topology Mirror**: Option to use topological mirroring for non-symmetrical posed meshes.
+### 2. Driving Bone Poses (Action Constraints)
+1. Select your **Driver Bone**.
+2. Shift-Select the **Armature** you want to drive (can be the same armature).
+3. Switch the panel fast-toggle to **Pose** mode.
+4. Select the **Driven Bone(s)** (the bones that should move).
+5. **Action Name** (Optional): Type a name like "LegBend" to label this setup.
+6. Enable channels: **Loc**, **Rot**, or **Scale**.
+7. Move the Driver Bone to the trigger position.
+8. Pose the Driven Bones to their target state.
+9. Click **Key Driver**.
+10. **Result**: The driver bone now controls that pose!
 
-### 7. Asymmetry / Split Tools
-New workflow for asymmetrical meshes or complex sculpting.
-*   **Create Asym Shape**:
-    *   **Name Field**: Enter a name to customize your new shape key (default: `AsymShape`).
-    *   Creates a new shape key and **automatically enables X-Mirror and Topology Mirror** on your mesh.
-    *   Allows symmetric sculpting on asymmetrical geometry.
-*   **Split Active Shape L/R**:
-    *   Takes a completed shape key.
-    *   Automatically generates Left/Right masks based on the X-axis.
-    *   Splits the shape into two separate keys (e.g. `Mouth_L`, `Mouth_R`).
+### 3. Managing Stacked Actions
+If you apply multiple pose drivers to a bone, they stack up.
+- Look at the **"Active SDK Stack"** list in the panel.
+- You will see items like `JawOpen`, `Smile`, etc.
+- **Remove**: Click the **X** button to remove just that specific link.
+- **Select**: Click the **Cursor Icon** to select ALL bones that share that action name.
 
-## Usage Workflow
-1.  **Select your Mesh or Armature**.
-2.  Open the **N-Panel (Sidebar)** in the 3D Viewport and find the **Maya Shape Keys** tab.
-3.  **Set the Driver**: Select your Armature, pick a bone, and click the Eyedropper.
-4.  **Create a Shape** (if Mesh) or **Select Bones** (if Armature & Set Driven Key panel set to Pose).
-5.  **Enable HUD**: Click "Show HUD" to visualize the driver and driven areas. Check colors via the Gear icon.
-6.  **Key it**:
-    *   Move the driver bone to the activation point.
-    *   Dial up the shape key OR pose the driven bones.
-    *   Click **Key Driver**.
-7.  **Mirror**: Click **Mirror** to instantly create the opposite side setup.
+### 4. Mirroring
+1. Select the bones you already set up (Left side).
+2. Click **Mirror**.
+3. The addon attempts to find the symmetrical bone (L -> R) and automatically mirrors the Action Constraint and Driver logic.
 
-## Optimization Notes
-This addon utilizes `numpy` (if installed in your Blender environment) for highly accelerated geometry calculations in the HUD. If `numpy` is not available, it safely falls back to standard Python, though highlighting on high-poly meshes (>100k verts) may be slower. The HUD automatically disabled for meshes > 500k vertices to prevent freezing.
+### 5. HUD Customization
+1. Click the small **Gear Icon** in the panel header.
+2. Use the **HUD Settings** popover to adjust:
+   - **Font Size**: Make text readable.
+   - **Line Width**: Make the highlight lines thicker/thinner.
+   - **Colors**: Change the driver/driven highlight colors.
+
+---
+**Created by Korn Sensei**

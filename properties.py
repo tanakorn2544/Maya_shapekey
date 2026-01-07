@@ -49,6 +49,13 @@ class DriverToolSettings(bpy.types.PropertyGroup):
     drive_location: bpy.props.BoolProperty(name="Location", default=False)
     drive_rotation: bpy.props.BoolProperty(name="Rotation", default=True)
     drive_scale: bpy.props.BoolProperty(name="Scale", default=False)
+    
+    # Pose Action Naming
+    pose_action_name: bpy.props.StringProperty(
+        name="Action Name",
+        description="Custom name for the Action Constraint. Leave empty for auto-naming",
+        default=""
+    )
 
     # Values for "Set Key"
     driver_value: bpy.props.FloatProperty(name="Driver Value", default=0.0)
