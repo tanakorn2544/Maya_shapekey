@@ -20,7 +20,10 @@ if "bpy" in locals():
         importlib.reload(operators.utils)
         importlib.reload(operators.driver_ops)
         importlib.reload(operators.pose_ops)
+        importlib.reload(operators.driver_ops)
+        importlib.reload(operators.pose_ops)
         importlib.reload(operators.shape_ops)
+        importlib.reload(operators.update_ops)
     if "ui" in locals():
         importlib.reload(ui)
     if "hud" in locals():
@@ -42,7 +45,48 @@ import os
 
 preview_collections = {}
 
+# --- ADDON PREFERENCES ---
+class BSETUP_AddonPreferences(bpy.types.AddonPreferences):
+    bl_idname = __name__
+    
+    # State Props
+    latest_version_str: bpy.props.StringProperty(
+        name="Latest Version",
+        default="Unknown"
+    )
+    
+    download_url: bpy.props.StringProperty(
+        name="Download URL",
+        default=""
+    )
+    
+    def draw(self, context):
+        layout = self.layout
+        
+        # Header Info
+        box = layout.box()
+        row = box.row()
+        row.label(text="Maya-Style Shape Key System", icon="SHAPEKEY_DATA")
+        row.label(text=f"Current Version: {bl_info['version']}")
+        
+        # Check Update Section
+        row = box.row()
+        row.scale_y = 1.2
+        row.operator("bsetup.check_for_updates", icon="FILE_REFRESH")
+        
+        # If we have a version string and it differs? 
+        # For simplicity, we just show what we found.
+        if self.latest_version_str != "Unknown":
+            box.label(text=f"Latest Release: {self.latest_version_str}")
+            
+            if self.download_url:
+                row = box.row()
+                row.scale_y = 1.5
+                row.alert = True 
+                row.operator("bsetup.update_addon", text="Install Update (Restart Required)", icon="IMPORT")
+
 def register():
+    bpy.utils.register_class(BSETUP_AddonPreferences) # Register Prefs First
     properties.register()
     operators.register()
     ui.register()
@@ -69,7 +113,10 @@ def unregister():
     
     ui.unregister()
     operators.unregister()
+    operators.unregister()
     properties.unregister()
+    
+    bpy.utils.unregister_class(BSETUP_AddonPreferences)
 
 if __name__ == "__main__":
     register()

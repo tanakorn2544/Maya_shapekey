@@ -21,7 +21,13 @@ from .shape_ops import (
     BSETUP_OT_CreateInBetween,
     BSETUP_OT_SplitShape,
     BSETUP_OT_CreateAsymShape,
+    BSETUP_OT_CreateAsymShape,
     BSETUP_OT_MirrorShapeAndDriver,
+)
+
+from .update_ops import (
+    BSETUP_OT_CheckForUpdates,
+    BSETUP_OT_UpdateAddon,
 )
 
 classes = (
@@ -39,7 +45,10 @@ classes = (
     BSETUP_OT_MirrorDriver,
     BSETUP_OT_MirrorShapeAndDriver,
     BSETUP_OT_SplitShape,
+    BSETUP_OT_SplitShape,
     BSETUP_OT_CreateAsymShape,
+    BSETUP_OT_CheckForUpdates,
+    BSETUP_OT_UpdateAddon,
 )
 
 def register():
