@@ -79,7 +79,17 @@ def copy_driver_to_fcurve(source_fcurve, target_fcurve, invert_values=False):
                 tgt.transform_space = src_tgt.transform_space
                 # Flip bone target
                 if src_tgt.bone_target:
-                    tgt.bone_target = flip_name(src_tgt.bone_target) or src_tgt.bone_target
+                    tgt.bone_target = flip_name(src_tgt.bone_target)
+                    
+                    if not tgt.bone_target:
+                        # Fallback: simple replace
+                        val = src_tgt.bone_target
+                        if ".L" in val: tgt.bone_target = val.replace(".L", ".R")
+                        elif ".R" in val: tgt.bone_target = val.replace(".R", ".L")
+                        elif "_L" in val: tgt.bone_target = val.replace("_L", "_R")
+                        elif "_R" in val: tgt.bone_target = val.replace("_R", "_L")
+                        else:
+                             tgt.bone_target = src_tgt.bone_target
             else:
                 tgt.data_path = src_tgt.data_path
                 # Flip Data Path string if it contains stereo naming

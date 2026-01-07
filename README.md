@@ -1,18 +1,11 @@
 # Maya-Style Shape Key System (Blender Addon)
 **Author:** Korn Sensei  
-**Version:** 2.1  
+**Version:** 2.2  
 **Blender Compatibility:** 4.0+
 
-## Overview
-This addon brings a **Maya-like Set Driven Key (SDK)** workflow to Blender, designed specifically for rigging and facial animation. It simplifies the process of driving shape keys **and bone poses** with other bone transforms or object properties, offering a familiar UI for users transitioning from Maya or those who prefer a more direct "Driver/Driven" approach.
-
-## Installation
-1. Download the `maya_shape_keys` folder.
-2. Place the folder into your Blender Addons directory:
-   - **Windows:** `%APPDATA%\Blender Foundation\Blender\<version>\scripts\addons\`
-   - **Mac/Linux:** `~/.config/blender/<version>/scripts/addons/`
-3. Open Blender, go to **Preferences > Add-ons**.
-4. Search for "Maya-Style Shape Key System" and enable it.
+## New in 2.2
+- **Robust Mirror Driver Fix**: Completely overhauled the "Mirror Pose Driver" logic to handle complex bone naming conventions (e.g., `Bone_L.001`) and "safety check" regressions. The system now intelligently verifies identifying targets to ensure perfect mirroring every time.
+- **Enhanced Name Flipping**: Improved fallback mechanisms for identifying left/right bone pairs when standard naming conventions are ambiguous.
 
 ## New in 2.1
 - **Expression-Based Pose Drivers**: Switched from Action Constraint curves to optimized Scripted Expressions (`clamp(...)`) for Location/Rotation/Scale driving. Faster, cleaner, and more robust.

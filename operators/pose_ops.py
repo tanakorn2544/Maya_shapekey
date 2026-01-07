@@ -329,16 +329,29 @@ class BSETUP_OT_MirrorPoseDriver(bpy.types.Operator):
                                             
                                             if flipped_bone:
                                                  tgt.bone_target = flipped_bone
+                                                 print(f"[DEBUG] SUCCESS: Flipped Bone Target to '{tgt.bone_target}'")
                                             else:
                                                  # Fallback: Try simple replace if flip_name failed
                                                  bt = src_tgt.bone_target
-                                                 if "_L" in bt: tgt.bone_target = bt.replace("_L", "_R")
-                                                 elif "_R" in bt: tgt.bone_target = bt.replace("_R", "_L")
-                                                 elif ".L" in bt: tgt.bone_target = bt.replace(".L", ".R")
+                                                 print(f"[DEBUG] FAIL: flip_name returned None for '{bt}'. Trying Fallback...")
+                                                 
+                                                 # New Logic: Try standard replacements without regex overkill first
+                                                 if ".L" in bt: tgt.bone_target = bt.replace(".L", ".R")
                                                  elif ".R" in bt: tgt.bone_target = bt.replace(".R", ".L")
+                                                 elif "_L" in bt: tgt.bone_target = bt.replace("_L", "_R")
+                                                 elif "_R" in bt: tgt.bone_target = bt.replace("_R", "_L")
                                                  else:
-                                                     tgt.bone_target = src_tgt.bone_target
-                                                     print(f"[WARNING] Could not flip bone target '{src_tgt.bone_target}'")
+                                                     # Try Regex for cases like Bone_L.001
+                                                     import re
+                                                     if re.search(r'(_[Ll])\.', bt):
+                                                         tgt.bone_target = re.sub(r'(_[Ll])\.', lambda m: m.group(1).replace('l', 'r').replace('L', 'R') + ".", bt)
+                                                     elif re.search(r'(\.[Ll])\.', bt):
+                                                         tgt.bone_target = re.sub(r'(\.[Ll])\.', lambda m: m.group(1).replace('l', 'r').replace('L', 'R') + ".", bt)
+                                                     else:
+                                                         tgt.bone_target = src_tgt.bone_target
+                                                         print(f"[WARNING] Could not flip bone target '{src_tgt.bone_target}'")
+                                                 
+                                                 print(f"[DEBUG] Fallback Result: '{tgt.bone_target}'")
                                     else:
                                         # Single Prop
                                         tgt.data_path = src_tgt.data_path
@@ -391,34 +404,55 @@ class BSETUP_OT_MirrorPoseDriver(bpy.types.Operator):
                                   # Standard Auto Logic
                                   copy_driver_to_fcurve(src_drv, tgt_drv_fc, final_invert)
                         
-                        # Fixup Variable Targets for Mirroring (Bone Sides) - FORCE CHECK
-                        # Sometimes utils.flip_name might miss, or context issues. 
-                        # We explicitly verify targets here.
-                        for var in tgt_drv_fc.driver.variables:
-                            for tgt in var.targets:
-                                if hasattr(tgt, "bone_target") and tgt.bone_target:
-                                    flipped_bone = flip_name(tgt.bone_target)
-                                    
-                                    # Fallback manual check for _l. / _r. patterns if flip_name returned None or failed
-                                    
-                                    # We use regex again to be safe about case preservation
-                                    # Pattern: _l followed by dot (specifically for .001 suffix cases)
-                                    if not flipped_bone or flipped_bone == tgt.bone_target:
-                                        import re
-                                        bt = tgt.bone_target
+                        # Fixup Variable Targets - GUIDED SAFETY CHECK
+                        # We iterate variables and check if they are still pointing to the SOURCE bone.
+                        # If so, we attempt to flip them.
+                        # This catches cases where upstream logic failed (e.g. reload issues) but avoids double-flipping valid changes.
+                        
+                        try:
+                            # Iterate Target Variables
+                            for i, var in enumerate(tgt_drv_fc.driver.variables):
+                                for j, tgt in enumerate(var.targets):
+                                    if not (hasattr(tgt, "bone_target") and tgt.bone_target):
+                                        continue
                                         
-                                        # Try _L. pattern
-                                        if re.search(r'(_[Ll])\.', bt):
-                                            flipped_bone = re.sub(r'(_[Ll])\.', lambda m: m.group(1).replace('l', 'r').replace('L', 'R') + ".", bt)
-                                        # Try .L. pattern
-                                        elif re.search(r'(\.[Ll])\.', bt):
-                                            flipped_bone = re.sub(r'(\.[Ll])\.', lambda m: m.group(1).replace('l', 'r').replace('L', 'R') + ".", bt)
+                                    # Get Source Equivalent for Comparison
+                                    # (Assumes 1:1 mapping preserved from copy)
+                                    src_bone_target = None
+                                    if i < len(src_drv.driver.variables):
+                                        s_var = src_drv.driver.variables[i]
+                                        if j < len(s_var.targets):
+                                            src_bone_target = s_var.targets[j].bone_target
+                                    
+                                    # CRITICAL GUARD: Only flip if Target == Source (Unchanged)
+                                    # This prevents double-flipping if upstream already worked.
+                                    if src_bone_target and tgt.bone_target == src_bone_target:
+                                        print(f"[DEBUG] Detected Unflipped Target '{tgt.bone_target}'. Attempting Force Flip...")
                                         
-                                    if flipped_bone and flipped_bone != tgt.bone_target:
-                                        print(f"[DEBUG] Fixing Driver Target: {tgt.bone_target} -> {flipped_bone}")
-                                        tgt.bone_target = flipped_bone
-                             
-                    count += 1
+                                        flipped_bone = flip_name(tgt.bone_target)
+                                        
+                                        # Fallback Manual
+                                        if not flipped_bone or flipped_bone == tgt.bone_target:
+                                             import re
+                                             bt = tgt.bone_target
+                                             if ".L" in bt: flipped_bone = bt.replace(".L", ".R")
+                                             elif ".R" in bt: flipped_bone = bt.replace(".R", ".L")
+                                             elif "_L" in bt: flipped_bone = bt.replace("_L", "_R")
+                                             elif "_R" in bt: flipped_bone = bt.replace("_R", "_L")
+                                             else:
+                                                 if re.search(r'(_[Ll])\.', bt):
+                                                     flipped_bone = re.sub(r'(_[Ll])\.', lambda m: m.group(1).replace('l', 'r').replace('L', 'R') + ".", bt)
+                                                 elif re.search(r'(\.[Ll])\.', bt):
+                                                     flipped_bone = re.sub(r'(\.[Ll])\.', lambda m: m.group(1).replace('l', 'r').replace('L', 'R') + ".", bt)
+                                        
+                                        if flipped_bone and flipped_bone != tgt.bone_target:
+                                             tgt.bone_target = flipped_bone
+                                             print(f"[DEBUG] Force Flip Success: -> {tgt.bone_target}")
+                                    
+                        except Exception as e:
+                            print(f"[ERROR] Safety Check Exception: {e}")
+                        
+                        count += 1
          
         # Force updates to ensure UI and Depsgraph catch up
         if selected_bones:
