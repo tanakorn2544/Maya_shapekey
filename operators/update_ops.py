@@ -1,5 +1,6 @@
 import bpy
 import urllib.request
+import urllib.error
 import json
 import ssl
 import os
@@ -29,85 +30,66 @@ class BSETUP_OT_CheckForUpdates(bpy.types.Operator):
         print(f"[MayaShapeKeys] Checking for updates from {GITHUB_API_URL}...")
         
         try:
-            # Create SSL context (sometimes needed for Blender's Python)
+            # Create SSL context
             ctx = ssl.create_default_context()
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
             
+            # 1. Try LATEST RELEASE endpoint
             req = urllib.request.Request(GITHUB_API_URL)
             req.add_header('User-Agent', 'Blender-Addon-Updater')
             
-                if response.status == 200:
-                    data = json.loads(response.read().decode())
-                    # Check if list (from tags) or dict (from release)
-                    if isinstance(data, list):
-                         if not data:
-                             self.report({'WARNING'}, "No tags/releases found.")
-                             return {'CANCELLED'}
-                         data = data[0] # Take first (latest)
-                         tag_name = data.get("name", "v0.0") # Tags use 'name', Releases 'tag_name' usually
-                         download_url = data.get("zipball_url", "")
-                    else:
-                         tag_name = data.get("tag_name", "v0.0")
-                         download_url = data.get("zipball_url", "")
-
-                    if not download_url:
-                        # Fallback for assets if zipball is empty?
-                        pass
-
-                    # Store in Preferences
-                    addon_name = __package__.split('.')[0]
-                    prefs = context.preferences.addons[addon_name].preferences
+            try:
+                with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
+                    if response.status == 200:
+                        data = json.loads(response.read().decode())
+                        tag_name = data.get("tag_name", "v0.0")
+                        download_url = data.get("zipball_url", "")
+                        
+                        self._apply_update_info(context, tag_name, download_url)
+                        return {'FINISHED'}
+                        
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    print("[MayaShapeKeys] Releases/Latest not found (404). Falling back to Tags...")
+                    # 2. Key error on 'latest', so try TAGS endpoint
+                    TAGS_URL = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/tags"
                     
-                    prefs.latest_version_str = tag_name
-                    prefs.download_url = download_url
+                    req_tags = urllib.request.Request(TAGS_URL)
+                    req_tags.add_header('User-Agent', 'Blender-Addon-Updater')
                     
-                    print(f"[MayaShapeKeys] Latest: {tag_name}, URL: {prefs.download_url}")
-                    self.report({'INFO'}, f"Latest Version: {tag_name}")
-                    return {'FINISHED'}
-
-            # If we reached here without returning, something unexpected happened or non-200
-            
-        except urllib.error.HTTPError as e:
-            if e.code == 404 and "releases/latest" in GITHUB_API_URL:
-                 print("[MayaShapeKeys] No 'Latest Release' found. Falling back to Tags...")
-                 # Try Tags Endpoint
-                 TAGS_URL = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/tags"
-                 
-                 try:
-                     ctx = ssl.create_default_context()
-                     ctx.check_hostname = False
-                     ctx.verify_mode = ssl.CERT_NONE
-                     
-                     req = urllib.request.Request(TAGS_URL)
-                     req.add_header('User-Agent', 'Blender-Addon-Updater')
-                     
-                     with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
-                         if response.status == 200:
-                             data = json.loads(response.read().decode())
-                             if data and isinstance(data, list):
-                                 latest_tag = data[0]
-                                 tag_name = latest_tag.get("name", "v0.0")
-                                 download_url = latest_tag.get("zipball_url", "")
+                    with urllib.request.urlopen(req_tags, context=ctx, timeout=10) as response_tags:
+                        if response_tags.status == 200:
+                             data_tags = json.loads(response_tags.read().decode())
+                             if data_tags and isinstance(data_tags, list):
+                                 latest = data_tags[0]
+                                 tag_name = latest.get("name", "v0.0")
+                                 download_url = latest.get("zipball_url", "")
                                  
-                                 addon_name = __package__.split('.')[0]
-                                 prefs = context.preferences.addons[addon_name].preferences
-                                 prefs.latest_version_str = tag_name
-                                 prefs.download_url = download_url
-                                 
-                                 self.report({'INFO'}, f"Latest Tag: {tag_name}")
+                                 self._apply_update_info(context, tag_name, download_url)
+                                 self.report({'INFO'}, f"Found Tag: {tag_name}")
+                                 self.report({'INFO'}, f"Found Tag: {tag_name}")
                                  return {'FINISHED'}
-                         
-                 except Exception as e2:
-                     print(f"Tags Method Failed: {e2}")
-            
-            self.report({'ERROR'}, f"Update Check Failed: {e}")
+                             else:
+                                 print(f"[MayaShapeKeys] Tags response is empty or invalid: {data_tags}")
+                                 self.report({'WARNING'}, "GitHub found no tags/releases.")
+                        else:
+                             print(f"[MayaShapeKeys] Tags Endpoint returned status: {response_tags.status}")
+                else:
+                    raise e
                     
         except Exception as e:
             print(f"[MayaShapeKeys] Update Check Failed: {e}")
             self.report({'ERROR'}, f"Update Check Failed: {e}")
             
         return {'FINISHED'}
+
+    def _apply_update_info(self, context, tag_name, download_url):
+        addon_name = __package__.split('.')[0]
+        prefs = context.preferences.addons[addon_name].preferences
+        prefs.latest_version_str = tag_name
+        prefs.download_url = download_url
+        print(f"[MayaShapeKeys] Found Version: {tag_name}, URL: {download_url}")
 
 class BSETUP_OT_UpdateAddon(bpy.types.Operator):
     """Download and Install the latest version"""
