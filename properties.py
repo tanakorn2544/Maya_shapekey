@@ -95,12 +95,19 @@ class DriverToolSettings(bpy.types.PropertyGroup):
         description="Color for the Driver highlight (Bone/Object)"
     )
     
+
     highlight_color_driven: bpy.props.FloatVectorProperty(
         name="Driven Color",
         subtype='COLOR',
         default=(1.0, 0.5, 0.0), # Orange
         min=0.0, max=1.0,
         description="Color for the Driven Shape highlight"
+    )
+
+    use_scale_fix: bpy.props.BoolProperty(
+        name="Smart Scale Fix",
+        description="Auto-apply normalization formula for Scale drivers (clamp((var-1)/(tgt-1))...) globally",
+        default=False
     )
 
 def register():

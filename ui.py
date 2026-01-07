@@ -142,7 +142,6 @@ class BSETUP_PT_DriverTool(bpy.types.Panel):
              
              row = col.row()
              row.operator("bsetup.remove_pose_driver", text="Remove", icon='X')
-             row.operator("bsetup.mirror_pose_driver", text="Mirror", icon='MOD_MIRROR')
 
         # --- ACTION SECTION ---
         layout.separator()
