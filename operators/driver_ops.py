@@ -674,64 +674,37 @@ class BSETUP_OT_AddDriverKey(bpy.types.Operator):
         # --- KEYFRAME MAPPING & CLAMPING ---
         # 1. Determine Rest Value of Driver
         # If Scale -> 1.0. If Loc/Rot -> 0.0.
-        # We can infer from string path
         driver_rest = 0.0
         if "scale" in props.driver_data_path: driver_rest = 1.0
-        if "quaternion" in props.driver_data_path and "[0]" in props.driver_data_path: driver_rest = 1.0 # W component
         
         # 2. Determine Target Value
         driver_target = driver_val
         
-        # 3. Setup F-Curve Keyframes
-        # We map Rest -> 0.0 (0% Influence)
-        # We map Target -> 1.0 (100% Influence)
-        # We map Falloff -> 0.0 (Return to Normal)
+        # 3. Setup Influence Driver with Expression
+        # We use a mathematical expression for all drivers (Loc/Rot/Scale)
+        # Expression: clamp((var - Rest) / (Target - Rest), 0, 1)
         
-        # Calculate Falloff Point (Symmetrical)
-        # If Rest=1, Target=2 -> Dist=1. Falloff at 3.
-        dist = driver_target - driver_rest
+        # Calculate Denominator (Target - Rest)
+        denom = driver_target - driver_rest
         
-        # Clear existing points
-        kps = d_fc.keyframe_points
-        while len(kps) > 0:
-            kps.remove(kps[0])
-            
-        # Determine Type
-        is_scale = "scale" in props.driver_data_path
-        
-        # SAFETY CHECK: If dist is essentially zero (User keyed at rest pose?),
-        # We can't build a proper curve. We should probably default to a standard 0..1 range?
-        if abs(dist) < 0.0001:
-            print("[WARNING] Driver Target is too close to Rest Value. Defaulting to 1.0 distance.")
-            # Assume standarad direction (positive)
-            dist = 1.0
-            driver_target = driver_rest + dist # Force target to be distinct for curve generation
-        
-        # Insert Keyframes
-        kps.insert(driver_rest, 0.0)
-        kps.insert(driver_target, 1.0)
-        
-        if is_scale:
-             # Scale -> Bell Curve Logic ("Return to Normal")
-             falloff_target = driver_target + dist
-             kps.insert(falloff_target, 0.0)
+        # Safety: Avoid division by zero
+        # If target and rest are too close, default to 1 unit distance to avoid error
+        if abs(denom) < 0.0001:
+             denom = 1.0
              
-             # Set Extrapolation to CONSTANT (Clamp at 0)
-             d_fc.extrapolation = 'CONSTANT'
-        else:
-             # Loc/Rot -> Linear Logic ("continue deforming")
-             # We want influence to grow past 1.0 if driver moves further
-             d_fc.extrapolation = 'LINEAR'
+        # Generate Expression
+        # We use f-string to embed constants. "var" is the dynamic input.
+        # Format: clamp((var - 0.0) / 1.0, 0, 1)
+        expr = f"clamp((var - {driver_rest:.3f}) / {denom:.4f}, 0, 1)"
+        drv.expression = expr
         
-        # 5. Handle Types
-        for kp in kps:
-            # Linear extrapolation needs Vector or Auto handles usually to be straight?
-            # Auto Clamped is fine, but for Linear Extrapolation, the slope at the end matters.
-            # If we want pure Linear, maybe VECTOR?
-            # But let's stick to Auto Clamped for smoothness between 0-1, 
-            # and Linear Extrapolation usually takes the gradient at the end.
-            kp.handle_left_type = 'AUTO_CLAMPED'
-            kp.handle_right_type = 'AUTO_CLAMPED'
+        # Clear any keyframes (Expression controls it fully)
+        # We enforce NO keyframes for this logical setup
+        while len(d_fc.keyframe_points) > 0:
+             d_fc.keyframe_points.remove(d_fc.keyframe_points[0])
+            
+        # 5. Handle Types (No longer needed for empty curves, but keeping for safety if switched back)
+        # We don't need to set handle types if there are no keyframes.
 
 
     def _setup_single_driver(self, driver_obj, id_data_owner, data_path, driver_val, driven_val, props, is_transform, target_transform_type, raw_path, array_index=-1):

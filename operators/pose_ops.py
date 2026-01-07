@@ -285,50 +285,111 @@ class BSETUP_OT_MirrorPoseDriver(bpy.types.Operator):
                         # Copy logic
                         # If the user provided a custom expression, we apply it AFTER copying
 
-                        if self.driver_expression != "var" or self.use_scale_fix:
-                             # We copy first to get variables, then override expression
-                             # We also DISABLE auto-invert if custom expression is used (User knows best)
-                             copy_driver_to_fcurve(src_drv, tgt_drv_fc, False)
-                             tgt_drv_fc.driver.type = 'SCRIPTED'
-                             
-                             # Expression Logic
-                             final_expr = self.driver_expression
-                             
-                             # Auto-Override if Scale Fix is requested
-                             if self.use_scale_fix:
-                                 final_expr = "clamp((var - 1) / (<TARGET> - 1), 0, 1)"
-                             
-                             # Token Substitution: <TARGET>
-                             # We can deduce the target value from the source driver's keyframes
-                             # Rest=0, Target=1 (usually)
-                             # kps[0] = (RestVal, 0)
-                             # kps[1] = (TargetVal, 1)
-                             target_val = 1.0
-                             if len(src_drv.keyframe_points) >= 2:
-                                 # We assume the second keyframe holds the target 
-                                 # (or whichever one has value 1.0, but simpler to blindly take index 1 for SDK)
-                                 target_val = src_drv.keyframe_points[1].co[0]
-                             
-                             if "<TARGET>" in final_expr:
-                                 final_expr = final_expr.replace("<TARGET>", f"{target_val:.4f}")
-                                 
-                             tgt_drv_fc.driver.expression = final_expr
-                             
-                             # CRITICAL: If using a custom expression to define value (e.g. normalization),
-                             # The existing keyframes (copied from source) will interfere or be ignored confusingly.
-                             # Usually we want to remove them so the Scripted Expression is the SOLE driver.
-                             # BUT only if the expression doesn't rely on them (which "var" usually implies it might if name is "var").
-                             # Actually, if type is SCRIPTED, keyframes are ignored unless using "Generator" modifier?
-                             # Regardles, for the logic `clamp((var-1)/(tgt-1)...)` to work, we want PURE MATH.
-                             # So we remove keyframes.
-                             for k in tgt_drv_fc.keyframe_points:
-                                  tgt_drv_fc.keyframe_points.remove(k)
-                                  
-                             print(f"[DEBUG] Applied Custom Expression: {final_expr}")
-                             tgt_drv_fc.update()
+                        
+                        # --- MIRROR LOGIC UPDATE for Expression-based Drivers (e.g. Scale) ---
+                        # If the source driver has NO keyframes (because it uses pure expression),
+                        # copy_driver_to_fcurve might not work perfectly or we need special handling.
+                        
+                        is_expression_only = len(src_drv.keyframe_points) == 0
+                        
+                        if is_expression_only:
+                            print(f"[DEBUG] Mirroring Expression-Only Driver (Scale Fix?)")
+                            
+                            # 1. Copy Driver Properties Manually
+                            tgt_drv_fc.driver.type = src_drv.driver.type
+                            tgt_drv_fc.driver.expression = src_drv.driver.expression
+                            
+                            # 2. Recreate Variables
+                            for src_var in src_drv.driver.variables:
+                                new_var = tgt_drv_fc.driver.variables.new()
+                                new_var.name = src_var.name
+                                new_var.type = src_var.type
+                                
+                                # Copy Targets
+                                for i, src_tgt in enumerate(src_var.targets):
+                                    tgt = new_var.targets[i]
+                                    tgt.id = src_tgt.id # Start with same ID
+                                    
+                                    # Handle ID Flipping (Object)
+                                    if src_tgt.id and hasattr(src_tgt.id, "name"):
+                                        flipped_id_name = flip_name(src_tgt.id.name)
+                                        if flipped_id_name and flipped_id_name in bpy.data.objects:
+                                             tgt.id = bpy.data.objects[flipped_id_name]
+                                    
+                                    # Handle TRANSFORMS
+                                    if src_var.type == 'TRANSFORMS':
+                                        tgt.transform_type = src_tgt.transform_type
+                                        tgt.transform_space = src_tgt.transform_space
+                                        
+                                        # FLIP BONE TARGET
+                                        if src_tgt.bone_target:
+                                            # Try logic flip
+                                            flipped_bone = flip_name(src_tgt.bone_target)
+                                            print(f"[DEBUG] Flipping Var Target: '{src_tgt.bone_target}' -> '{flipped_bone}'")
+                                            
+                                            if flipped_bone:
+                                                 tgt.bone_target = flipped_bone
+                                            else:
+                                                 # Fallback: Try simple replace if flip_name failed
+                                                 bt = src_tgt.bone_target
+                                                 if "_L" in bt: tgt.bone_target = bt.replace("_L", "_R")
+                                                 elif "_R" in bt: tgt.bone_target = bt.replace("_R", "_L")
+                                                 elif ".L" in bt: tgt.bone_target = bt.replace(".L", ".R")
+                                                 elif ".R" in bt: tgt.bone_target = bt.replace(".R", ".L")
+                                                 else:
+                                                     tgt.bone_target = src_tgt.bone_target
+                                                     print(f"[WARNING] Could not flip bone target '{src_tgt.bone_target}'")
+                                    else:
+                                        # Single Prop
+                                        tgt.data_path = src_tgt.data_path
+                                        # Try flipping path (e.g. pose.bones["Bone.L"])
+                                        # This is complex but usually handled by flip_name if simple string
+                                        pass
+
+                            # 3. Apply Expression
+                            # Handle Auto-Invert (e.g. Loc X needs to be flipped)
+                            # Expression is typically: clamp((var - Rest) / Denom, ...)
+                            if auto_invert:
+                                 # We wrap 'var' with '(-var)'
+                                 # This is a safe heuristic for our specific generated expressions.
+                                 if "var" in tgt_drv_fc.driver.expression:
+                                      tgt_drv_fc.driver.expression = tgt_drv_fc.driver.expression.replace("var", "(-var)")
+                                      print(f"[DEBUG] Inverted Expression var: {tgt_drv_fc.driver.expression}")
+                            
+                            tgt_drv_fc.update()
+                            
                         else:
-                             # Standard Auto Logic
-                             copy_driver_to_fcurve(src_drv, tgt_drv_fc, final_invert)
+                             # Standard Keyframe-based Copy
+                             if self.driver_expression != "var" or self.use_scale_fix:
+                                  # We copy first to get variables, then override expression
+                                  copy_driver_to_fcurve(src_drv, tgt_drv_fc, False)
+                                  tgt_drv_fc.driver.type = 'SCRIPTED'
+                                  
+                                  # Expression Logic
+                                  final_expr = self.driver_expression
+                                  
+                                  # Auto-Override if Scale Fix is requested
+                                  if self.use_scale_fix:
+                                      final_expr = "clamp((var - 1) / (<TARGET> - 1), 0, 1)"
+                                  
+                                  # Token Substitution: <TARGET>
+                                  target_val = 1.0
+                                  if len(src_drv.keyframe_points) >= 2:
+                                      target_val = src_drv.keyframe_points[1].co[0]
+                                  
+                                  if "<TARGET>" in final_expr:
+                                      final_expr = final_expr.replace("<TARGET>", f"{target_val:.4f}")
+                                      
+                                  tgt_drv_fc.driver.expression = final_expr
+                                  
+                                  # Remove keyframes for custom expression
+                                  for k in tgt_drv_fc.keyframe_points:
+                                       tgt_drv_fc.keyframe_points.remove(k)
+                                       
+                                  tgt_drv_fc.update()
+                             else:
+                                  # Standard Auto Logic
+                                  copy_driver_to_fcurve(src_drv, tgt_drv_fc, final_invert)
                         
                         # Fixup Variable Targets for Mirroring (Bone Sides) - FORCE CHECK
                         # Sometimes utils.flip_name might miss, or context issues. 

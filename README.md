@@ -1,6 +1,6 @@
 # Maya-Style Shape Key System (Blender Addon)
 **Author:** Korn Sensei  
-**Version:** 1.9  
+**Version:** 2.1  
 **Blender Compatibility:** 4.0+
 
 ## Overview
@@ -13,6 +13,10 @@ This addon brings a **Maya-like Set Driven Key (SDK)** workflow to Blender, desi
    - **Mac/Linux:** `~/.config/blender/<version>/scripts/addons/`
 3. Open Blender, go to **Preferences > Add-ons**.
 4. Search for "Maya-Style Shape Key System" and enable it.
+
+## New in 2.1
+- **Expression-Based Pose Drivers**: Switched from Action Constraint curves to optimized Scripted Expressions (`clamp(...)`) for Location/Rotation/Scale driving. Faster, cleaner, and more robust.
+- **Improved Mirroring**: Pose Driver mirroring now handles expression inversion automatically and accurately flips Bone Targets even without keyframe data.
 
 ## Features
 
@@ -50,11 +54,13 @@ Drive armature bones directly, similar to driving shape keys.
 *   **Select Bones**: Select the bones you want to drive in the viewport.
 *   **Choose Channels**: Toggle `Loc`, `Rot`, or `Scale` in the UI to determine which attributes to drive.
 *   **Batch Keying**: Clicking "Key Driver" applies the driver to all selected bones for the active channels.
+    *   **Smart Expressions**: Now uses a robust `clamp` expression (e.g. `clamp((var-0)/1, 0, 1)`) instead of keyframes. This ensures predictable 0-1 influence control and cleaner data.
 *   **Remove Driver**: Select bones and click "Remove" to delete drivers for the active channels.
 *   **Mirror Pose Driver**:
     *   Select driven bones on one side (e.g. `Finger.L`).
     *   Click **Mirror** to replicate the driver to the opposite side (`Finger.R`).
     *   **Smart Flipping**: Automatically flips the **Driver Target** too (e.g. if `Ctrl.L` drives `Finger.L`, then `Ctrl.R` will drive `Finger.R`). Supports complex naming (`L_Bone`, `.L`, `Left`, etc.).
+    *   **Auto Inversion**: Intelligent handling of mirror axes (e.g. Location X), automatically generating inverted expressions (e.g. `-var`).
 
 ### 4. Shape Editor
 A dedicated list view and toolkit for managing shape keys.
