@@ -238,7 +238,7 @@ class BSETUP_PT_ShapeEditor(bpy.types.Panel):
 
 
 class BSETUP_PT_ColorSettings(bpy.types.Panel):
-    bl_label = "Highlight Colors"
+    bl_label = "HUD Settings"
     bl_idname = "BSETUP_PT_ColorSettings"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'WINDOW'
@@ -246,6 +246,13 @@ class BSETUP_PT_ColorSettings(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         props = context.scene.maya_shape_keys
+        
+        # Font Size
+        layout.label(text="Display")
+        layout.prop(props, "hud_font_size")
+        layout.prop(props, "hud_line_width")
+        layout.separator()
+        
         layout.label(text="Driver Highlight")
         layout.prop(props, "highlight_color_driver", text="")
         layout.separator()

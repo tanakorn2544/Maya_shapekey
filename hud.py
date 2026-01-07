@@ -36,7 +36,13 @@ class DrawHUD:
 
         font_id = 0
         pixel_size = context.preferences.system.pixel_size
-        font_size = int(16 * pixel_size) 
+        
+        # Get Font Size from Props
+        base_font_size = 16
+        if hasattr(props, "hud_font_size"):
+            base_font_size = props.hud_font_size
+            
+        font_size = int(base_font_size * pixel_size) 
         line_height = int(font_size * 1.5)
         padding = int(10 * pixel_size)
         x_pos = int(20 * pixel_size)
@@ -156,6 +162,11 @@ class DrawHUD:
         driven_rgb = props.highlight_color_driven if hasattr(props, "highlight_color_driven") else (1.0, 0.5, 0.0)
         driven_color = (driven_rgb[0], driven_rgb[1], driven_rgb[2], 0.4)
         
+        # Get Line Width from Props
+        line_width = 3.0
+        if hasattr(props, "hud_line_width"):
+            line_width = props.hud_line_width
+        
         # 1. Driver Bone
         if props.driver_target:
             obj = props.driver_target
@@ -166,7 +177,7 @@ class DrawHUD:
                     p2 = obj.matrix_world @ pb.tail
                     shader = gpu.shader.from_builtin('UNIFORM_COLOR')
                     gpu.state.blend_set('ALPHA')
-                    gpu.state.line_width_set(3.0)
+                    gpu.state.line_width_set(line_width)
                     gpu.state.depth_test_set('NONE') 
                     
                     batch = batch_for_shader(shader, 'LINES', {"pos": [p1, p2]})
@@ -292,7 +303,7 @@ class DrawHUD:
             if lines:
                 shader = gpu.shader.from_builtin('UNIFORM_COLOR')
                 gpu.state.blend_set('ALPHA')
-                gpu.state.line_width_set(3.0)
+                gpu.state.line_width_set(line_width)
                 gpu.state.depth_test_set('NONE')
                 
                 batch = batch_for_shader(shader, 'LINES', {"pos": lines})

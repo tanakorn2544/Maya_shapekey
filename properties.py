@@ -86,6 +86,24 @@ class DriverToolSettings(bpy.types.PropertyGroup):
         update=update_hud
     )
     
+    hud_font_size: bpy.props.IntProperty(
+        name="HUD Font Size",
+        default=16,
+        min=10,
+        max=72,
+        description="Font size for the Viewport HUD overlay",
+        update=update_hud
+    )
+    
+    hud_line_width: bpy.props.FloatProperty(
+        name="HUD Line Width",
+        default=3.0,
+        min=1.0,
+        max=10.0,
+        description="Line thickness for the HUD bone highlights",
+        update=update_hud
+    )
+    
     # Visualization Colors
     highlight_color_driver: bpy.props.FloatVectorProperty(
         name="Driver Color",
